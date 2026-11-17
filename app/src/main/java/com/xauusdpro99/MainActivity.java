@@ -10,6 +10,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.xauusdpro99.data.connection.BiquoteConnectionEngine;
+import com.xauusdpro99.data.alert.MarketAlertEngine;
 import com.xauusdpro99.data.connection.BiquoteTick;
 import com.xauusdpro99.data.candle.Candle;
 import com.xauusdpro99.data.candle.CandleEngine;
@@ -29,7 +30,7 @@ import java.util.Date;
 import java.util.Map;
 
 public final class MainActivity extends Activity implements BiquoteConnectionEngine.Listener, MultiTimeframeEngine.Listener {
-    private TextView price, bidAsk, timestamp, status, source, log, candleSummary, indicatorSummary, patternSummary, structureSummary, supplySummary, signalSummary, entryRiskSummary, marketJourneySummary;
+    private TextView price, bidAsk, timestamp, status, source, log, candleSummary, indicatorSummary, patternSummary, structureSummary, supplySummary, signalSummary, entryRiskSummary, marketJourneySummary, alertSummary;
     private volatile BiquoteConnectionEngine.Status connectionStatus = BiquoteConnectionEngine.Status.DISCONNECTED;
     private volatile BiquoteTick latestTick;
     private volatile long latestQuoteReceivedAtMs;
@@ -37,6 +38,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     private final SignalFrequencyController frequencyController = new SignalFrequencyController();
     private final EntryRiskEngine entryRiskEngine = new EntryRiskEngine();
     private final MarketJourneyEngine marketJourneyEngine = new MarketJourneyEngine();
+    private final MarketAlertEngine marketAlertEngine = new MarketAlertEngine();
     private BiquoteConnectionEngine engine;
     private MultiTimeframeEngine candleEngine;
 
@@ -70,6 +72,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         signalSummary = text("MULTI-TIMEFRAME SIGNAL SCORING: menunggu data valid dari 12 timeframe.", 13, 0xFFFFFFFF);
         entryRiskSummary = text("ENTRY / RISK PLAN: menunggu data tervalidasi.", 13, 0xFFFFFFFF);
         marketJourneySummary = text("MARKET JOURNEY: menunggu quote dan level aktual.", 13, 0xFFFFFFFF);
+        alertSummary = text("MARKET ALERT: menunggu candle tertutup valid.", 13, 0xFFFFFFFF);
         log = text("Log koneksi dan candle…", 12, 0xFFB0BEC5);
 
         root.addView(title, matchWrap());
@@ -102,6 +105,8 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         root.addView(riskScroll, new LinearLayout.LayoutParams(-1, 0, 2));
         ScrollView journeyScroll = new ScrollView(this); journeyScroll.addView(marketJourneySummary);
         root.addView(journeyScroll, new LinearLayout.LayoutParams(-1, 0, 3));
+        ScrollView alertScroll = new ScrollView(this); alertScroll.addView(alertSummary);
+        root.addView(alertScroll, new LinearLayout.LayoutParams(-1, 0, 2));
         ScrollView logScroll = new ScrollView(this);
         logScroll.addView(log);
         root.addView(logScroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -293,6 +298,16 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             signals.append("\n").append(frequencyController.report(System.currentTimeMillis()));
             signals.append("\nCatatan: 12 kandidat/hari adalah target evaluasi, bukan kuota. Batas skor 57 dan seluruh hard gate tetap wajib. Statistik performa belum tersedia tanpa hasil historis/outcome tervalidasi.");
             signalSummary.setText(signals.toString());
+            java.util.List<MarketAlertEngine.Alert> alerts = marketAlertEngine.evaluate(new MarketAlertEngine.Input(
+                    snapshots, indicatorResults, structureResults, supplyResults, patternResults, scoredResults, System.currentTimeMillis()));
+            StringBuilder alertText = new StringBuilder("EMA20/EMA50 + MARKET ALERT — CLOSED CANDLES ONLY\\n");
+            if (alerts.isEmpty()) alertText.append("Belum ada peristiwa baru yang memenuhi syarat.\\n");
+            for (MarketAlertEngine.Alert a : alerts) alertText.append(a.type).append(" | TF=").append(a.timeframe)
+                    .append(" | Harga=").append(fmt(a.price)).append(" | Waktu=")
+                    .append(DateFormat.getDateTimeInstance().format(new Date(a.timestampMs))).append(" | ").append(a.status)
+                    .append("\\nAlasan: ").append(a.reason).append("\\nInvalidasi: ").append(a.invalidation).append("\\n\\n");
+            alertText.append("Timeframe: M1 M2 M3 M5 M15 M30 H1 H4 H8 H12 D1 W1 | cooldown 5 menit.");
+            alertSummary.setText(alertText.toString());
 
             StringBuilder riskText = new StringBuilder("ENTRY / STOP LOSS / TAKE PROFIT — LEVEL TEKNIS AKTUAL\\n");
             for (SignalScoringEngine.Result scored : scoredResults) {
