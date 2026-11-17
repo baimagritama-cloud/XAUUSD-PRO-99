@@ -11,6 +11,7 @@ import android.widget.TextView;
 
 import com.xauusdpro99.data.connection.BiquoteConnectionEngine;
 import com.xauusdpro99.data.connection.BiquoteTick;
+import com.xauusdpro99.data.candle.Candle;
 import com.xauusdpro99.data.candle.CandleEngine;
 import com.xauusdpro99.data.candle.CandleTimeframe;
 import com.xauusdpro99.data.candle.MultiTimeframeEngine;

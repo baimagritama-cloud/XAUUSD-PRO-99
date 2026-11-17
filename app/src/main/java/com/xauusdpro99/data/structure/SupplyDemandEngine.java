@@ -19,7 +19,7 @@ public final class SupplyDemandEngine {
              ZoneStatus status,double distance,long updated,String invalidation){
             this.id=id;timeframe=tf;this.type=type;this.upper=upper;this.lower=lower;formedAtMs=formed;
             this.tests=tests;this.status=status;this.distance=distance;lastUpdatedAtMs=updated;
-            label=tf+" "+type.name();color=tfColor(tf,type);
+            label=tf+" "+type.name();color=timeframeColor(tf,type);
             invalidationCondition=invalidation;
         }
         public boolean active(){return status!=ZoneStatus.INVALIDATED;}
