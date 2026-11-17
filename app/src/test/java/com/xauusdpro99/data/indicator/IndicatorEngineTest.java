@@ -33,7 +33,7 @@ public class IndicatorEngineTest {
         List<Candle> bars=rising(220);
         IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),null,NOW);
         assertEquals(Validity.LIVE,r.validity);
-        assertEquals(100d+219d/100d*100d,r.momentum14,0.000001); // close[219] / close[205] * 100
+        assertEquals(319d/305d*100d,r.momentum14,0.000001); // Close[last] / Close[last-14] * 100
         assertEquals(100d,r.rsi14,0.000001);
     }
 
@@ -41,9 +41,9 @@ public class IndicatorEngineTest {
         List<Candle> bars=rising(220);
         IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),null,NOW);
         assertNotNull(r.ema200);
-        assertEquals(3d,r.atr14,0.000001);
+        assertEquals(2d,r.atr14,0.000001);
         assertEquals(100d,r.adx14,0.000001);
-        assertEquals(100d,r.plusDi14,0.000001);
+        assertEquals(50d,r.plusDi14,0.000001);
         assertEquals(0d,r.minusDi14,0.000001);
     }
 
