@@ -18,6 +18,14 @@ public class IndicatorEngineTest {
         return e.snapshot(NOW);
     }
 
+    private CandleEngine.Snapshot daily() {
+        long day = Math.floorDiv(NOW, 86_400_000L) * 86_400_000L - 86_400_000L;
+        List<Candle> bars = new ArrayList<>();
+        bars.add(new Candle("XAUUSD", CandleTimeframe.D1, day, 100, 110, 90, 105, 0, 0,
+                false, "fixture daily", NOW));
+        return snapshot(bars, CandleTimeframe.D1);
+    }
+
     private List<Candle> rising(int count) {
         List<Candle> bars=new ArrayList<>();
         long end=Math.floorDiv(NOW,60_000L)*60_000L;
