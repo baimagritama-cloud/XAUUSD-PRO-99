@@ -107,8 +107,10 @@ public final class CandlePatternEngine {
             case EVENING_STAR:return star(b.get(i-2),prev,c,false);
             case THREE_SOLDIERS:return soldiers(b.get(i-2),prev,c);
             case THREE_CROWS:return crows(b.get(i-2),prev,c);
-            case HAMMER:case HANGING_MAN:return m.bodyRatio<=0.38&&m.lower>=2*m.body&&m.upper<=0.45*m.body&&m.closePosition>=0.60&&atr>0&&m.atrRelative>=0.45&&m.atrRelative<=2.8;
-            case INVERTED_HAMMER:case SHOOTING_STAR:return m.bodyRatio<=0.38&&m.upper>=2*m.body&&m.lower<=0.45*m.body&&m.closePosition<=0.40&&atr>0&&m.atrRelative>=0.45&&m.atrRelative<=2.8;
+            case HAMMER:return priorDowntrend(b,i)&&m.bodyRatio<=0.38&&m.lower>=2*m.body&&m.upper<=0.45*m.body&&m.closePosition>=0.60&&atr>0&&m.atrRelative>=0.45&&m.atrRelative<=2.8;
+            case HANGING_MAN:return priorUptrend(b,i)&&m.bodyRatio<=0.38&&m.lower>=2*m.body&&m.upper<=0.45*m.body&&m.closePosition>=0.60&&atr>0&&m.atrRelative>=0.45&&m.atrRelative<=2.8;
+            case INVERTED_HAMMER:return priorDowntrend(b,i)&&m.bodyRatio<=0.38&&m.upper>=2*m.body&&m.lower<=0.45*m.body&&m.closePosition<=0.40&&atr>0&&m.atrRelative>=0.45&&m.atrRelative<=2.8;
+            case SHOOTING_STAR:return priorUptrend(b,i)&&m.bodyRatio<=0.38&&m.upper>=2*m.body&&m.lower<=0.45*m.body&&m.closePosition<=0.40&&atr>0&&m.atrRelative>=0.45&&m.atrRelative<=2.8;
             case DRAGONFLY:return m.bodyRatio<=0.10&&m.upper<=m.range*0.10&&m.lower>=m.range*0.60;
             case GRAVESTONE:return m.bodyRatio<=0.10&&m.lower<=m.range*0.10&&m.upper>=m.range*0.60;
             case TWEEZER_BOTTOM:return bearish(prev)&&bullish(c)&&Math.abs(prev.low-c.low)<=tol&&m.bodyRatio>=0.20&&pm.bodyRatio>=0.20;
@@ -121,8 +123,10 @@ public final class CandlePatternEngine {
             case THREE_INSIDE_DOWN:return bullish(b.get(i-2))&&bearish(prev)&&bodyLow(prev)>bodyLow(b.get(i-2))&&bodyHigh(prev)<bodyHigh(b.get(i-2))&&bearish(c)&&c.close<b.get(i-2).open;
             case THREE_OUTSIDE_UP:return bearish(b.get(i-2))&&bullish(prev)&&bodyLow(prev)<=bodyLow(b.get(i-2))&&bodyHigh(prev)>=bodyHigh(b.get(i-2))&&bullish(c)&&c.close>prev.close;
             case THREE_OUTSIDE_DOWN:return bullish(b.get(i-2))&&bearish(prev)&&bodyLow(prev)<=bodyLow(b.get(i-2))&&bodyHigh(prev)>=bodyHigh(b.get(i-2))&&bearish(c)&&c.close<prev.close;
-            case BULL_PIN:case BULL_REJECTION:return m.lower>=2.5*m.body&&m.upper<=0.50*m.body&&m.closePosition>=0.65&&m.bodyRatio<=0.35&&m.atrRelative>=0.35;
-            case BEAR_PIN:case BEAR_REJECTION:return m.upper>=2.5*m.body&&m.lower<=0.50*m.body&&m.closePosition<=0.35&&m.bodyRatio<=0.35&&m.atrRelative>=0.35;
+            case BULL_PIN:return m.lower>=2.5*m.body&&m.upper<=0.40*m.body&&m.closePosition>=0.70&&m.bodyRatio<=0.30&&m.atrRelative>=0.35;
+            case BULL_REJECTION:return m.lower>=2.5*m.body&&m.upper<=0.50*m.body&&m.closePosition>=0.65&&m.bodyRatio<=0.35&&m.atrRelative>=0.35;
+            case BEAR_PIN:return m.upper>=2.5*m.body&&m.lower<=0.40*m.body&&m.closePosition<=0.30&&m.bodyRatio<=0.30&&m.atrRelative>=0.35;
+            case BEAR_REJECTION:return m.upper>=2.5*m.body&&m.lower<=0.50*m.body&&m.closePosition<=0.35&&m.bodyRatio<=0.35&&m.atrRelative>=0.35;
             default:return false;
         }
     }
@@ -143,7 +147,9 @@ public final class CandlePatternEngine {
                 &&insideBody(b,a)&&insideBody(c,b)&&x.bodyRatio>=0.5&&y.bodyRatio>=0.5&&z.bodyRatio>=0.5
                 &&x.lower<=x.body*0.45&&y.lower<=y.body*0.45&&z.lower<=z.body*0.45;
     }
-    private static boolean insideBody(Candle inner,Candle outer){return inner.open>=bodyLow(outer)&&inner.open<=bodyHigh(outer)&&inner.close>=bodyLow(outer)&&inner.close<=bodyHigh(outer);}
+    private static boolean insideBody(Candle inner,Candle outer){return inner.open>=bodyLow(outer)&&inner.open<=bodyHigh(outer);}
+    private static boolean priorDowntrend(List<Candle> b,int i){return i>=3&&b.get(i-1).close<b.get(i-3).close;}
+    private static boolean priorUptrend(List<Candle> b,int i){return i>=3&&b.get(i-1).close>b.get(i-3).close;}
     private static Pattern build(P p,List<Candle> bars,int i,double atr,Context ctx){
         Candle c=bars.get(i);int n=requiredBars(p);double high=-Double.MAX_VALUE,low=Double.MAX_VALUE;
         for(int k=i-n+1;k<=i;k++){high=Math.max(high,bars.get(k).high);low=Math.min(low,bars.get(k).low);}

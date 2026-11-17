@@ -17,7 +17,7 @@ public class CandlePatternEngineTest {
     }
     private CandleEngine.Snapshot snapshot(List<Candle> bars){CandleEngine e=new CandleEngine(CandleTimeframe.M1);e.replaceFromServer(bars,NOW,"UNIT TEST");return e.snapshot(NOW);}
     private CandlePatternEngine.Pattern find(List<CandlePatternEngine.Pattern> ps,String name){for(CandlePatternEngine.Pattern p:ps)if(p.name.equals(name))return p;return null;}
-    private double[][] flat15(){double[][] v=new double[15][4];for(int i=0;i<15;i++){v[i]=new double[]{100,101,99,100.2};}return v;}
+    private double[][] flat15(){double[][] v=new double[15][4];for(int i=0;i<15;i++){double close=101-i*0.10;v[i]=new double[]{close-0.1,close+0.8,close-0.8,close};}return v;}
 
     @Test public void bullishEngulfingIsDetectedOnClosedBars(){
         List<Candle> bars=make(new double[][]{{105,106,99,100},{99,108,98,107}});
