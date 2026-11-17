@@ -52,7 +52,7 @@ public final class MarketJourneyEngine {
   String pos="Harga "+f(x.price)+"; "+(dem!=null&&dem.distance==0?"di dalam Demand "+dem.timeframe:sup!=null&&sup.distance==0?"di dalam Supply "+sup.timeframe:"di luar zona terdekat");
   String safe=lv.isEmpty()?"Belum ada level valid untuk menilai area aman":"Relatif lebih aman bila berjarak > "+f(near)+" dari level terdekat; bukan jaminan";
   String caution=inside?"WASPADA: harga berada di dalam zona aktif":safety==Safety.CAUTION?"WASPADA: harga dekat level struktural":"Waspadai spread/volatilitas dan reaksi pada level terdekat";
-  String dest=dir.equals("BULLISH")?describe(resistance!=null?resistance:sup):dir.equals("BEARISH")?describe(support!=null?support:dem):"Belum ada tujuan terarah tervalidasi";
+  Level destination=nextOpposingZone(x,dir); if(destination==null)destination=dir.equals("BULLISH")?resistance:dir.equals("BEARISH")?support:null; String dest=describe(destination);
   Candle m5=last(x,CandleTimeframe.M5);
   if(dem!=null){bull.add("Demand "+dem.timeframe+" berada pada "+f(dem.lower)+"–"+f(dem.upper)+".");
    if(m5!=null)bull.add("Skenario BUY: tunggu candle M5 close di atas high candle konfirmasi aktual "+f(m5.high)+" dan retest bertahan; tujuan teknis berikutnya "+dest+".");}
@@ -81,6 +81,18 @@ public final class MarketJourneyEngine {
  private static String direction(Input x){int b=0,s=0;if(x.structures!=null)for(CandleTimeframe t:new CandleTimeframe[]{CandleTimeframe.W1,CandleTimeframe.D1,CandleTimeframe.H4}){
   MarketStructureEngine.Result r=x.structures.get(t);if(r!=null&&r.validity.startsWith("VALID")){if(r.trend==MarketStructureEngine.Trend.BULLISH)b++;if(r.trend==MarketStructureEngine.Trend.BEARISH)s++;}}
   if(b>s)return "BULLISH";if(s>b)return "BEARISH";return "MIXED / UNKNOWN";}
+
+ private static Level nextOpposingZone(Input x,String dir){
+  if(x.zones==null)return null;Level best=null;
+  for(SupplyDemandEngine.Result r:x.zones.values())if(r!=null&&r.validity.startsWith("VALID"))
+   for(SupplyDemandEngine.Zone z:r.activeZones()){
+    boolean valid=dir.equals("BULLISH")?z.type==SupplyDemandEngine.ZoneType.SUPPLY&&z.lower>x.price:
+      dir.equals("BEARISH")&&z.type==SupplyDemandEngine.ZoneType.DEMAND&&z.upper<x.price;
+    if(!valid)continue;Level n=new Level(z.label,z.timeframe,z.type.name(),z.lower,z.upper,x.price);
+    if(best==null||n.distance<best.distance)best=n;
+   }
+  return best;
+ }
  private static Level zone(Input x,SupplyDemandEngine.ZoneType type){Level best=null;if(x.zones!=null)for(SupplyDemandEngine.Result r:x.zones.values())if(r!=null&&r.validity.startsWith("VALID"))
   for(SupplyDemandEngine.Zone z:r.activeZones())if(z.type==type){Level n=new Level(z.label,z.timeframe,type.name(),z.lower,z.upper,x.price);if(best==null||n.distance<best.distance)best=n;}return best;}
  private static Level swing(Input x,boolean high){Level best=null;if(x.structures!=null)for(Map.Entry<CandleTimeframe,MarketStructureEngine.Result> it:x.structures.entrySet()){
