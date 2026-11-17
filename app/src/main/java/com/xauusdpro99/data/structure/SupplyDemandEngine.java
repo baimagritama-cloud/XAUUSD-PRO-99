@@ -8,7 +8,7 @@ import java.util.*;
 public final class SupplyDemandEngine {
     public enum ZoneType { SUPPLY, DEMAND }
     public enum ZoneStatus { FRESH, TESTED, WEAKENED, INVALIDATED }
-    public enum BreakoutType { VALID_UP, VALID_DOWN, FALSE_UP, FALSE_DOWN }
+    public enum BreakoutType { VALID_UP, VALID_DOWN, FALSE_UP, FALSE_DOWN, RETEST_UP, RETEST_DOWN }
     public enum RetestStatus { NONE, RETESTED_REJECTED, RETESTED_ACCEPTED, WAITING }
     public static final class Zone {
         public final String id,timeframe,label,color;
@@ -77,10 +77,12 @@ public final class SupplyDemandEngine {
             boolean intersects=c.high>=bottom-candleTol&&c.low<=top+candleTol;
             if(type==ZoneType.DEMAND&&c.close<bottom-candleTol){
                 events.add(new Breakout(BreakoutType.VALID_DOWN,bottom,c.close,c.closeTimeMs(),RetestStatus.WAITING,"Close candle di bawah Demand; zona INVALIDATED"));
+                addRetestEvent(events,b,i+1,bottom,ZoneType.DEMAND,tol);
                 broken=true;status=ZoneStatus.INVALIDATED;break;
             }
             if(type==ZoneType.SUPPLY&&c.close>top+candleTol){
                 events.add(new Breakout(BreakoutType.VALID_UP,top,c.close,c.closeTimeMs(),RetestStatus.WAITING,"Close candle di atas Supply; zona INVALIDATED"));
+                addRetestEvent(events,b,i+1,top,ZoneType.SUPPLY,tol);
                 broken=true;status=ZoneStatus.INVALIDATED;break;
             }
             boolean wickBreak=type==ZoneType.DEMAND?c.low<bottom-candleTol&&c.close>=bottom-candleTol:c.high>top+candleTol&&c.close<=top+candleTol;
@@ -99,6 +101,19 @@ public final class SupplyDemandEngine {
         double distance=price<bottom?bottom-price:(price>top?price-top:0d);
         String invalid=type==ZoneType.DEMAND?"Candle close < "+fmt(bottom)+" - tolerance":"Candle close > "+fmt(top)+" + tolerance";
         return new Zone(id,tf,type,top,bottom,formed,tests,status,distance,now,invalid);
+    }
+    private static void addRetestEvent(List<Breakout> events,List<Candle> bars,int start,double level,ZoneType brokenZone,double tolerance){
+        for(int j=start;j<bars.size();j++){
+            Candle c=bars.get(j);
+            double tol=Math.max(atrAt(bars,j,14)*0.05,c.close*0.000001);
+            boolean touched=brokenZone==ZoneType.DEMAND?c.high>=level-tol:c.low<=level+tol;
+            if(!touched)continue;
+            boolean rejected=brokenZone==ZoneType.DEMAND?c.close<level-tol:c.close>level+tol;
+            RetestStatus state=rejected?RetestStatus.RETESTED_REJECTED:RetestStatus.RETESTED_ACCEPTED;
+            events.add(new Breakout(brokenZone==ZoneType.DEMAND?BreakoutType.RETEST_DOWN:BreakoutType.RETEST_UP,
+                    level,c.close,c.closeTimeMs(),state,rejected?"Retest ditolak dari bawah/atas level breakout":"Retest diterima kembali melewati level breakout"));
+            return;
+        }
     }
     private static double atr(List<Candle>b,int p){return atrAt(b,b.size()-1,p);}
     private static double atrAt(List<Candle>b,int end,int p){if(end<p)return 0;double s=0;for(int i=end-p+1;i<=end;i++)s+=tr(b.get(i),b.get(i-1).close);return s/p;}
