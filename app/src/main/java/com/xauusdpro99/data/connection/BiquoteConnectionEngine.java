@@ -73,7 +73,7 @@ public final class BiquoteConnectionEngine {
                 });
                 hub = connection;
                 connection.start().blockingAwait();
-                connection.send("Subscribe", new String[]{SYMBOL}).blockingAwait();
+                connection.send("Subscribe", (Object) new String[]{SYMBOL});
                 started.set(true);
                 connecting.set(false);
                 nextBackoffMs = INITIAL_BACKOFF_MS;
