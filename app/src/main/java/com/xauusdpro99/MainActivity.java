@@ -279,7 +279,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                         .append(" | Entry=").append(fmt(result.entry))
                         .append(" | SL=").append(fmt(result.stopLoss))
                         .append(" | Target=").append(fmt(result.target))
-                        .append(" | RR=").append(fmt(result.riskReward))
+                        .append(" | RR=").append(fmt(result.rr))
                         .append(" | Spread=").append(fmt(result.spread)).append("\n");
                 for (SignalScoringEngine.Component component : result.components)
                     signals.append(component.name).append(": ").append(component.points).append("/")
@@ -303,13 +303,13 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                         connectionStatus == BiquoteConnectionEngine.Status.LIVE, quoteValid));
                 riskText.append("\\n").append(scored.direction).append(" | SCORE ").append(scored.totalScore)
                         .append(" | ").append(plan.summary).append("\\nEntry=").append(fmt(plan.entry))
-                        .append(" SL=").append(fmt(plan.stopLoss)).append(" Risk=").append(fmt(plan.riskDistance))
-                        .append(" ATR=").append(fmt(plan.atr)).append(" RR=").append(fmt(plan.riskReward)).append("\\n");
+                        .append(" SL=").append(fmt(plan.sl)).append(" Risk=").append(fmt(plan.risk))
+                        .append(" ATR=").append(fmt(plan.atr)).append(" RR=").append(fmt(plan.rr)).append("\\n");
                 for (EntryRiskEngine.Target t : plan.targets)
                     riskText.append(t.label).append("=").append(fmt(t.price)).append(" | ").append(t.timeframe)
-                            .append(" | ").append(t.source).append(" | RR=").append(fmt(t.riskReward)).append("\\n");
-                for (String reason : plan.acceptedReasons) riskText.append("OK: ").append(reason).append("\\n");
-                for (String reason : plan.rejectedReasons) riskText.append("BLOCK: ").append(reason).append("\\n");
+                            .append(" | ").append(t.source).append(" | RR=").append(fmt(t.rr)).append("\\n");
+                for (String reason : plan.accepted) riskText.append("OK: ").append(reason).append("\\n");
+                for (String reason : plan.rejected) riskText.append("BLOCK: ").append(reason).append("\\n");
             }
             entryRiskSummary.setText(riskText.toString());
 
@@ -326,9 +326,9 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                     .append("\\nArea Aman=").append(journey.safeArea).append("\\nArea Waspada=").append(journey.cautionArea)
                     .append("\\nSkenario bullish:\\n");
             for (String s : journey.bullishScenario) journeyText.append("• ").append(s).append("\\n");
-            journeyText.append("Pembatalan bullish: ").append(journey.cancellationBullish).append("\\nSkenario bearish:\\n");
+            journeyText.append("Pembatalan bullish: ").append(journey.cancelBullish).append("\\nSkenario bearish:\\n");
             for (String s : journey.bearishScenario) journeyText.append("• ").append(s).append("\\n");
-            journeyText.append("Pembatalan bearish: ").append(journey.cancellationBearish).append("\\nPotensi reversal:\\n");
+            journeyText.append("Pembatalan bearish: ").append(journey.cancelBearish).append("\\nPotensi reversal:\\n");
             for (String s : journey.reversalNotes) journeyText.append("• ").append(s).append("\\n");
             for (MarketJourneyEngine.Level l : journey.nearbyLevels)
                 journeyText.append(l.type).append(" ").append(l.timeframe).append(" ").append(l.label)

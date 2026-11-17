@@ -131,14 +131,14 @@ public final class EntryRiskEngine {
   if(x.zones!=null)for(SupplyDemandEngine.Result r:x.zones.values())if(r!=null)for(SupplyDemandEngine.Zone z:r.activeZones()){
    boolean right=d==SignalScoringEngine.Direction.BUY?z.type==SupplyDemandEngine.ZoneType.DEMAND:z.type==SupplyDemandEngine.ZoneType.SUPPLY;
    if(right&&p.formationPrice>=z.lower&&p.formationPrice<=z.upper){double v=d==SignalScoringEngine.Direction.BUY?z.lower:z.upper;
-    if(d==SignalScoringEngine.Direction.BUY&&v<e)anchor=Math.max(anchor,v);
-    if(d==SignalScoringEngine.Direction.SELL&&v>e)anchor=Math.min(anchor,v);}
+    if(d==SignalScoringEngine.Direction.BUY&&v<e)anchor=Math.min(anchor,v);
+    if(d==SignalScoringEngine.Direction.SELL&&v>e)anchor=Math.max(anchor,v);}
   }
   MarketStructureEngine.Result m=x.structures==null?null:x.structures.get(tf(p.timeframe));
   if(m!=null){MarketStructureEngine.Swing sw=d==SignalScoringEngine.Direction.BUY?m.lastSwingLow:m.lastSwingHigh;
    if(sw!=null&&pos(atr(x,p))&&Math.abs(e-sw.price)<=atr(x,p)*1.5){
-    if(d==SignalScoringEngine.Direction.BUY&&sw.price<e)anchor=Math.max(anchor,sw.price);
-    if(d==SignalScoringEngine.Direction.SELL&&sw.price>e)anchor=Math.min(anchor,sw.price);
+    if(d==SignalScoringEngine.Direction.BUY&&sw.price<e)anchor=Math.min(anchor,sw.price);
+    if(d==SignalScoringEngine.Direction.SELL&&sw.price>e)anchor=Math.max(anchor,sw.price);
    }}
   return d==SignalScoringEngine.Direction.BUY?anchor-b:anchor+b;
  }
