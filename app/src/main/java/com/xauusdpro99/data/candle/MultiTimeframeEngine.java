@@ -1,0 +1,120 @@
+package com.xauusdpro99.data.candle;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public final class MultiTimeframeEngine {
+    public interface Listener {
+        void onUpdated(Map<CandleTimeframe, CandleEngine.Snapshot> snapshots);
+        void onLog(String message);
+    }
+
+    private final EnumMap<CandleTimeframe, CandleEngine> engines = new EnumMap<>(CandleTimeframe.class);
+    private final BiquoteOhlcClient client = new BiquoteOhlcClient();
+    private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private final Listener listener;
+
+    public MultiTimeframeEngine(Listener listener) {
+        this.listener = listener;
+        for (CandleTimeframe tf : CandleTimeframe.values()) engines.put(tf, new CandleEngine(tf));
+        for (CandleTimeframe tf : CandleTimeframe.values()) {
+            if (!tf.nativeSupported && !tf.isAggregatedFromM1()) {
+                engines.get(tf).markUnavailable("UNSUPPORTED — interval tidak tercantum pada dokumentasi BiQuote");
+            }
+        }
+    }
+
+    public void refreshAll() {
+        worker.execute(() -> {
+            List<Candle> m1 = null;
+            for (CandleTimeframe tf : CandleTimeframe.values()) {
+                if (!tf.nativeSupported) continue;
+                try {
+                    List<Candle> bars = client.fetch(tf);
+                    long received = System.currentTimeMillis();
+                    engines.get(tf).replaceFromServer(bars, received, "BiQuote OHLC REST (" + tf.biquoteInterval + ")");
+                    if (tf == CandleTimeframe.M1) m1 = bars;
+                    listener.onLog(tf + ": respons " + bars.size() + " bar; disimpan "
+                            + engines.get(tf).snapshot(received).closed.size() + " candle tertutup.");
+                } catch (Exception error) {
+                    engines.get(tf).markUnavailable("ERROR OHLC: " + error.getMessage());
+                    listener.onLog(tf + ": gagal mengambil OHLC — " + error.getMessage());
+                }
+            }
+            if (m1 != null) {
+                List<Candle> sorted = new ArrayList<>(m1);
+                sorted.sort(Comparator.comparingLong(c -> c.openTimeMs));
+                long now = System.currentTimeMillis();
+                for (CandleTimeframe tf : new CandleTimeframe[]{CandleTimeframe.M2, CandleTimeframe.M3}) {
+                    List<Candle> aggregated = aggregateClosedM1(sorted, tf, now);
+                    engines.get(tf).replaceAggregated(aggregated, now, "AGGREGATED dari BiQuote M1 (bukan candle native)");
+                    listener.onLog(tf + ": hasil agregasi lengkap " + aggregated.size() + " candle.");
+                }
+            } else {
+                engines.get(CandleTimeframe.M2).markUnavailable("UNAVAILABLE — data M1 tidak berhasil diambil");
+                engines.get(CandleTimeframe.M3).markUnavailable("UNAVAILABLE — data M1 tidak berhasil diambil");
+            }
+            listener.onUpdated(snapshotAll(System.currentTimeMillis()));
+        });
+    }
+
+    static List<Candle> aggregateClosedM1(List<Candle> input, CandleTimeframe target, long nowMs) {
+        if (target != CandleTimeframe.M2 && target != CandleTimeframe.M3) {
+            throw new IllegalArgumentException("Hanya M2/M3 yang diagregasi dari M1");
+        }
+        int groupSize = target == CandleTimeframe.M2 ? 2 : 3;
+        List<Candle> m1 = new ArrayList<>();
+        for (Candle c : input) {
+            if (c != null && c.timeframe == CandleTimeframe.M1 && !c.isOpen
+                    && c.isClosedAt(nowMs) && CandleEngine.isValid(c, nowMs)) m1.add(c);
+        }
+        m1.sort(Comparator.comparingLong(c -> c.openTimeMs));
+        List<Candle> output = new ArrayList<>();
+        for (int i = 0; i + groupSize <= m1.size();) {
+            Candle first = m1.get(i);
+            long bucket = Math.floorDiv(first.openTimeMs, target.durationMs) * target.durationMs;
+            if (first.openTimeMs != bucket) { i++; continue; }
+            boolean complete = true;
+            double high = first.high, low = first.low, volume = 0d;
+            long tickVolume = 0L;
+            for (int j = 0; j < groupSize; j++) {
+                Candle part = m1.get(i + j);
+                if (part.openTimeMs != bucket + j * CandleTimeframe.M1.durationMs) {
+                    complete = false; break;
+                }
+                high = Math.max(high, part.high);
+                low = Math.min(low, part.low);
+                volume += part.volume;
+                tickVolume += part.tickVolume;
+            }
+            if (complete && bucket + target.durationMs <= nowMs) {
+                Candle last = m1.get(i + groupSize - 1);
+                output.add(new Candle("XAUUSD", target, bucket, first.open, high, low, last.close,
+                        volume, tickVolume, false, "AGGREGATED dari BiQuote M1", nowMs));
+                i += groupSize;
+            } else {
+                i++;
+            }
+        }
+        if (output.size() > CandleEngine.RETAIN_CLOSED) {
+            return new ArrayList<>(output.subList(output.size() - CandleEngine.RETAIN_CLOSED, output.size()));
+        }
+        return output;
+    }
+
+    public Map<CandleTimeframe, CandleEngine.Snapshot> snapshotAll(long nowMs) {
+        EnumMap<CandleTimeframe, CandleEngine.Snapshot> result = new EnumMap<>(CandleTimeframe.class);
+        for (Map.Entry<CandleTimeframe, CandleEngine> entry : engines.entrySet()) {
+            result.put(entry.getKey(), entry.getValue().snapshot(nowMs));
+        }
+        return Collections.unmodifiableMap(result);
+    }
+
+    public void close() { worker.shutdownNow(); }
+}
