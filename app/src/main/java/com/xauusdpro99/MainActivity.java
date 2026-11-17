@@ -16,13 +16,15 @@ import com.xauusdpro99.data.candle.CandleTimeframe;
 import com.xauusdpro99.data.candle.MultiTimeframeEngine;
 import com.xauusdpro99.data.indicator.IndicatorEngine;
 import com.xauusdpro99.data.pattern.CandlePatternEngine;
+import com.xauusdpro99.data.structure.MarketStructureEngine;
+import com.xauusdpro99.data.structure.SupplyDemandEngine;
 
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.Map;
 
 public final class MainActivity extends Activity implements BiquoteConnectionEngine.Listener, MultiTimeframeEngine.Listener {
-    private TextView price, bidAsk, timestamp, status, source, log, candleSummary, indicatorSummary, patternSummary;
+    private TextView price, bidAsk, timestamp, status, source, log, candleSummary, indicatorSummary, patternSummary, structureSummary, supplySummary;
     private BiquoteConnectionEngine engine;
     private MultiTimeframeEngine candleEngine;
 
@@ -51,6 +53,8 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         candleSummary = text("CANDLE ENGINE: belum mengambil data.", 12, 0xFFE0E0E0);
         indicatorSummary = text("INDICATOR ENGINE: menunggu OHLC tertutup yang valid.", 12, 0xFFE0E0E0);
         patternSummary = text("CANDLE PATTERN ENGINE: menunggu candle tertutup yang valid.", 12, 0xFFE0E0E0);
+        structureSummary = text("MARKET STRUCTURE: menunggu data.", 12, 0xFFE0E0E0);
+        supplySummary = text("SUPPLY / DEMAND: menunggu data.", 12, 0xFFE0E0E0);
         log = text("Log koneksi dan candle…", 12, 0xFFB0BEC5);
 
         root.addView(title, matchWrap());
@@ -70,6 +74,12 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         ScrollView patternScroll = new ScrollView(this);
         patternScroll.addView(patternSummary);
         root.addView(patternScroll, new LinearLayout.LayoutParams(-1, 0, 2));
+        ScrollView structureScroll = new ScrollView(this);
+        structureScroll.addView(structureSummary);
+        root.addView(structureScroll, new LinearLayout.LayoutParams(-1, 0, 2));
+        ScrollView supplyScroll = new ScrollView(this);
+        supplyScroll.addView(supplySummary);
+        root.addView(supplyScroll, new LinearLayout.LayoutParams(-1, 0, 2));
         ScrollView logScroll = new ScrollView(this);
         logScroll.addView(log);
         root.addView(logScroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -149,6 +159,35 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             }
             indicatorSummary.setText(indicators.toString());
 
+            MarketStructureEngine structureEngine = new MarketStructureEngine();
+            SupplyDemandEngine supplyEngine = new SupplyDemandEngine();
+            StringBuilder structures = new StringBuilder("MARKET STRUCTURE — CLOSED CANDLES ONLY\n");
+            StringBuilder supplies = new StringBuilder("SUPPLY / DEMAND — NO FIBONACCI\n");
+            java.util.Map<CandleTimeframe, java.util.List<CandlePatternEngine.PriceZone>> zonesByTf = new java.util.EnumMap<>(CandleTimeframe.class);
+            for (CandleTimeframe tf : CandleTimeframe.values()) {
+                CandleEngine.Snapshot snap = snapshots.get(tf);
+                MarketStructureEngine.Result ms = structureEngine.analyze(snap, System.currentTimeMillis());
+                structures.append("\n").append(tf).append(" | trend=").append(ms.trend).append(" | ").append(ms.validity).append("\n");
+                structures.append("Last swing high=").append(ms.lastSwingHigh == null ? "--" : ms.lastSwingHigh.label + " " + fmt(ms.lastSwingHigh.price) + " confirmed " + DateFormat.getDateTimeInstance().format(new Date(ms.lastSwingHigh.confirmedAtMs)))
+                        .append(" | low=").append(ms.lastSwingLow == null ? "--" : ms.lastSwingLow.label + " " + fmt(ms.lastSwingLow.price) + " confirmed " + DateFormat.getDateTimeInstance().format(new Date(ms.lastSwingLow.confirmedAtMs))).append("\n");
+                for (MarketStructureEngine.Event e : ms.events) structures.append(e.type).append(" level=").append(fmt(e.level)).append(" close=").append(fmt(e.close)).append(" at=").append(DateFormat.getDateTimeInstance().format(new Date(e.timestampMs))).append("\n");
+                Candle latest = snap == null || snap.closed.isEmpty() ? null : snap.closed.get(snap.closed.size()-1);
+                double current = latest == null ? 0d : latest.close;
+                SupplyDemandEngine.Result sd = supplyEngine.analyze(snap, current, System.currentTimeMillis());
+                java.util.List<CandlePatternEngine.PriceZone> patternZones = new java.util.ArrayList<>();
+                supplies.append("\n").append(tf).append(" | ").append(sd.validity).append("\n");
+                for (SupplyDemandEngine.Zone z : sd.zones) {
+                    supplies.append(z.label).append(" [").append(fmt(z.lower)).append(" - ").append(fmt(z.upper)).append("] | status=").append(z.status)
+                            .append(" | tests=").append(z.tests).append(" | distance=").append(fmt(z.distance))
+                            .append(" | formed=").append(DateFormat.getDateTimeInstance().format(new Date(z.formedAtMs)))
+                            .append(" | color=").append(z.color).append(" | invalidate: ").append(z.invalidationCondition).append("\n");
+                    if (z.active()) patternZones.add(new CandlePatternEngine.PriceZone(
+                            z.type == SupplyDemandEngine.ZoneType.DEMAND ? CandlePatternEngine.ZoneType.DEMAND : CandlePatternEngine.ZoneType.SUPPLY,
+                            z.lower, z.upper, z.label + " " + z.status));
+                }
+                for (SupplyDemandEngine.Breakout e : sd.breakouts) supplies.append(e.type).append(" level=").append(fmt(e.level)).append(" close=").append(fmt(e.close)).append(" retest=").append(e.retest).append(" ").append(e.note).append("\n");
+                zonesByTf.put(tf, patternZones);
+            }
             StringBuilder patterns = new StringBuilder("CANDLE PATTERNS — closed OHLC only\n");
             CandlePatternEngine patternEngine = new CandlePatternEngine();
             for (CandleTimeframe tf : CandleTimeframe.values()) {
@@ -157,7 +196,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                 IndicatorEngine.Result same = indicatorEngine.calculate(snap, daily, System.currentTimeMillis());
                 IndicatorEngine.Result higher = higherTf == null ? null
                         : indicatorEngine.calculate(snapshots.get(higherTf), daily, System.currentTimeMillis());
-                CandlePatternEngine.Context context = new CandlePatternEngine.Context(same, higher, java.util.Collections.emptyList());
+                CandlePatternEngine.Context context = new CandlePatternEngine.Context(same, higher, zonesByTf.get(tf));
                 java.util.List<CandlePatternEngine.Pattern> detected = patternEngine.detect(snap, context, System.currentTimeMillis());
                 patterns.append("\n").append(tf).append(" | ");
                 if (detected.isEmpty()) {
@@ -175,6 +214,8 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                 }
             }
             patternSummary.setText(patterns.toString());
+            structureSummary.setText(structures.toString());
+            supplySummary.setText(supplies.toString());
         });
     }
 
