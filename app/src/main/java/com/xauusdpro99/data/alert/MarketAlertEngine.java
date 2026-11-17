@@ -77,7 +77,7 @@ public final class MarketAlertEngine {
   }
   return Collections.unmodifiableList(out);
  }
- private void emit(List<Alert>o,String k,Type t,String tf,double p,long ts,String st,String r,String v,long now){String id=t+":"+k;Long last=emitted.get(id);if(last!=null&&(now<last||now-last<COOLDOWN_MS))return;emitted.put(id,now);o.add(new Alert(t,tf,p,ts,st,r,v));}
+ private void emit(List<Alert>o,String k,Type t,String tf,double p,long ts,String st,String r,String v,long now){String id=t+":"+tf;Long last=emitted.get(id);if(last!=null&&(now<last||now-last<COOLDOWN_MS))return;emitted.put(id,now);o.add(new Alert(t,tf,p,ts,st,r,v));}
  private static double ema(List<Candle>b,int end,int n){if(end<n)return Double.NaN;double v=0;for(int i=0;i<n;i++)v+=b.get(i).close;v/=n;double a=2d/(n+1);for(int i=n;i<end;i++)v=a*b.get(i).close+(1-a)*v;return v;}
  private static double atr(List<Candle>b){double v=0;for(int i=b.size()-14;i<b.size();i++){Candle c=b.get(i),p=b.get(i-1);v+=Math.max(c.high-c.low,Math.max(Math.abs(c.high-p.close),Math.abs(c.low-p.close)));}return v/14;}
  private static double body(Candle c){return Math.abs(c.close-c.open);}private static double lower(Candle c){return Math.min(c.open,c.close)-c.low;}private static double upper(Candle c){return c.high-Math.max(c.open,c.close);}
