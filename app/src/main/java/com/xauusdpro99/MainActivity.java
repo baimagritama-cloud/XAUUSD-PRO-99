@@ -31,6 +31,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     private volatile BiquoteTick latestTick;
     private volatile long latestQuoteReceivedAtMs;
     private final SignalScoringEngine signalEngine = new SignalScoringEngine();
+    private final SignalFrequencyController frequencyController = new SignalFrequencyController();
     private BiquoteConnectionEngine engine;
     private MultiTimeframeEngine candleEngine;
 
@@ -253,10 +254,16 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                     latestQuoteReceivedAtMs, System.currentTimeMillis(), bidValue, askValue,
                     spreadValue, SignalScoringEngine.DEFAULT_MAX_SPREAD);
             StringBuilder signals = new StringBuilder("SIGNAL QUALITY — SKOR BUKAN PROBABILITAS WINRATE\n");
-            for (SignalScoringEngine.Result result : signalEngine.evaluate(scoringInput)) {
+            java.util.List<SignalScoringEngine.Result> scoredResults = signalEngine.evaluate(scoringInput);
+            java.util.List<SignalFrequencyController.Decision> frequencyDecisions =
+                    frequencyController.process(scoredResults, System.currentTimeMillis());
+            for (SignalFrequencyController.Decision decision : frequencyDecisions) {
+                SignalScoringEngine.Result result = decision.result;
                 signals.append("\n").append(result.direction).append(" | SCORE ")
                         .append(result.totalScore).append("/100 | ").append(result.quality)
-                        .append(" | FINAL ").append(result.status).append("\n");
+                        .append(" | ENGINE ").append(result.status)
+                        .append(" | FREQUENCY ").append(decision.published ? "PUBLISHED" : "BLOCKED")
+                        .append(" — ").append(decision.reason).append("\n");
                 signals.append("Pattern: ").append(result.patternName)
                         .append(" | Entry=").append(fmt(result.entry))
                         .append(" | SL=").append(fmt(result.stopLoss))
@@ -272,7 +279,8 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                 for (String reason : result.acceptedReasons) signals.append("OK: ").append(reason).append("\n");
                 for (String reason : result.rejectedReasons) signals.append("BLOCK: ").append(reason).append("\n");
             }
-            signals.append("\nCatatan: sinyal entry hanya boleh BUY/SELL jika seluruh 12 timeframe LIVE dan semua hard gate lolos.");
+            signals.append("\n").append(frequencyController.report(System.currentTimeMillis()));
+            signals.append("\nCatatan: 12 kandidat/hari adalah target evaluasi, bukan kuota. Batas skor 57 dan seluruh hard gate tetap wajib. Statistik performa belum tersedia tanpa hasil historis/outcome tervalidasi.");
             signalSummary.setText(signals.toString());
         });
     }
