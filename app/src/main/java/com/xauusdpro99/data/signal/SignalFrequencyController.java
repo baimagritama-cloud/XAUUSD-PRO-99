@@ -33,6 +33,7 @@ public final class SignalFrequencyController {
 
     private final List<Seen> seen = new ArrayList<>();
     private final List<Decision> audit = new ArrayList<>();
+    private final Set<String> auditedCandidateStates = new HashSet<>();
     private final EnumMap<SignalScoringEngine.Direction, Long> lastPublished =
             new EnumMap<>(SignalScoringEngine.Direction.class);
 
@@ -53,7 +54,6 @@ public final class SignalFrequencyController {
                 out.add(new Decision(r, false, "Deduplikasi lintas timeframe: pola yang sama sudah tercatat"));
                 continue;
             }
-            seen.add(new Seen(r.direction, fingerprint, patternTime));
             boolean scoreOk = r.totalScore >= SignalScoringEngine.MIN_CANDIDATE_SCORE;
             boolean engineEntry = r.status == SignalScoringEngine.Status.BUY
                     || r.status == SignalScoringEngine.Status.SELL;
@@ -76,12 +76,16 @@ public final class SignalFrequencyController {
                     publish = true;
                     reason = "Skor >=57, status entry engine lolos, tidak invalid, dedup dan cooldown lolos";
                     lastPublished.put(r.direction, nowMs);
+                    seen.add(new Seen(r.direction, fingerprint, patternTime));
                 }
             }
             Decision decision = new Decision(r, publish, reason);
             out.add(decision);
-            audit.add(decision);
-            while (audit.size() > MAX_AUDIT_RECORDS) audit.remove(0);
+            String auditKey = fingerprint + "|" + r.status + "|" + (publish ? "PUBLISHED" : "REJECTED");
+            if (auditedCandidateStates.add(auditKey)) {
+                audit.add(decision);
+                while (audit.size() > MAX_AUDIT_RECORDS) audit.remove(0);
+            }
         }
         return Collections.unmodifiableList(out);
     }
