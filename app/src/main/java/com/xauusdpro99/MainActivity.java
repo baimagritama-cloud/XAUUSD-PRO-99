@@ -15,13 +15,14 @@ import com.xauusdpro99.data.candle.CandleEngine;
 import com.xauusdpro99.data.candle.CandleTimeframe;
 import com.xauusdpro99.data.candle.MultiTimeframeEngine;
 import com.xauusdpro99.data.indicator.IndicatorEngine;
+import com.xauusdpro99.data.pattern.CandlePatternEngine;
 
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.Map;
 
 public final class MainActivity extends Activity implements BiquoteConnectionEngine.Listener, MultiTimeframeEngine.Listener {
-    private TextView price, bidAsk, timestamp, status, source, log, candleSummary, indicatorSummary;
+    private TextView price, bidAsk, timestamp, status, source, log, candleSummary, indicatorSummary, patternSummary;
     private BiquoteConnectionEngine engine;
     private MultiTimeframeEngine candleEngine;
 
@@ -49,6 +50,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         refreshCandles.setOnClickListener(v -> candleEngine.refreshAll());
         candleSummary = text("CANDLE ENGINE: belum mengambil data.", 12, 0xFFE0E0E0);
         indicatorSummary = text("INDICATOR ENGINE: menunggu OHLC tertutup yang valid.", 12, 0xFFE0E0E0);
+        patternSummary = text("CANDLE PATTERN ENGINE: menunggu candle tertutup yang valid.", 12, 0xFFE0E0E0);
         log = text("Log koneksi dan candle…", 12, 0xFFB0BEC5);
 
         root.addView(title, matchWrap());
@@ -65,6 +67,9 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         ScrollView indicatorScroll = new ScrollView(this);
         indicatorScroll.addView(indicatorSummary);
         root.addView(indicatorScroll, new LinearLayout.LayoutParams(-1, 0, 2));
+        ScrollView patternScroll = new ScrollView(this);
+        patternScroll.addView(patternSummary);
+        root.addView(patternScroll, new LinearLayout.LayoutParams(-1, 0, 2));
         ScrollView logScroll = new ScrollView(this);
         logScroll.addView(log);
         root.addView(logScroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -143,11 +148,48 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                         .append(r.validityDetail).append("\n");
             }
             indicatorSummary.setText(indicators.toString());
+
+            StringBuilder patterns = new StringBuilder("CANDLE PATTERNS — closed OHLC only\n");
+            CandlePatternEngine patternEngine = new CandlePatternEngine();
+            for (CandleTimeframe tf : CandleTimeframe.values()) {
+                CandleEngine.Snapshot snap = snapshots.get(tf);
+                CandleTimeframe higherTf = higherTimeframe(tf);
+                IndicatorEngine.Result same = indicatorEngine.calculate(snap, daily, System.currentTimeMillis());
+                IndicatorEngine.Result higher = higherTf == null ? null
+                        : indicatorEngine.calculate(snapshots.get(higherTf), daily, System.currentTimeMillis());
+                CandlePatternEngine.Context context = new CandlePatternEngine.Context(same, higher, java.util.Collections.emptyList());
+                java.util.List<CandlePatternEngine.Pattern> detected = patternEngine.detect(snap, context, System.currentTimeMillis());
+                patterns.append("\n").append(tf).append(" | ");
+                if (detected.isEmpty()) {
+                    patterns.append("NO CONFIRMED PATTERN / DATA NOT LIVE\n");
+                } else {
+                    for (CandlePatternEngine.Pattern p : detected) {
+                        patterns.append(p.name).append(" | ").append(p.direction)
+                                .append(" | price=").append(fmt(p.formationPrice))
+                                .append(" | time=").append(DateFormat.getDateTimeInstance().format(new Date(p.timestampMs)))
+                                .append(" | location=").append(p.location)
+                                .append(" | strength=").append(p.strength).append("/100")
+                                .append(" | status=").append(p.status)
+                                .append(" | invalidate: ").append(p.invalidationCondition).append("\n");
+                    }
+                }
+            }
+            patternSummary.setText(patterns.toString());
         });
     }
 
     @Override public void onLog(String message) {
         runOnUiThread(() -> log.append("\n" + DateFormat.getTimeInstance().format(new Date()) + " " + message));
+    }
+
+    private CandleTimeframe higherTimeframe(CandleTimeframe tf) {
+        switch (tf) {
+            case M1: case M2: case M3: case M5: case M15: return CandleTimeframe.H1;
+            case M30: case H1: return CandleTimeframe.H4;
+            case H4: case H8: case H12: return CandleTimeframe.D1;
+            case D1: case W1: return null;
+            default: return null;
+        }
     }
 
     private String fmt(Double value) { return value == null ? "NOT ENOUGH DATA" : String.format(java.util.Locale.US, "%.2f", value); }
