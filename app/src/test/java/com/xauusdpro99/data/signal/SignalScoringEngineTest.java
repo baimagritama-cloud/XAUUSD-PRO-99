@@ -1,0 +1,8 @@
+package com.xauusdpro99.data.signal;
+import org.junit.Test;import java.util.*;import com.xauusdpro99.data.candle.CandleTimeframe;
+import static org.junit.Assert.*;
+public class SignalScoringEngineTest {
+ @Test public void exactQualityThresholds(){assertEquals(SignalScoringEngine.Quality.NO_TRADE,SignalScoringEngine.qualityForTest(56));assertEquals(SignalScoringEngine.Quality.EARLY_LOWER_QUALITY,SignalScoringEngine.qualityForTest(57));assertEquals(SignalScoringEngine.Quality.MODERATE_QUALITY,SignalScoringEngine.qualityForTest(70));assertEquals(SignalScoringEngine.Quality.HIGH_QUALITY,SignalScoringEngine.qualityForTest(85));}
+ @Test public void weightsSumTo100(){assertEquals(100,SignalScoringEngine.WEIGHT_PATTERN+SignalScoringEngine.WEIGHT_LOCATION+SignalScoringEngine.WEIGHT_INDICATORS+SignalScoringEngine.WEIGHT_STRUCTURE+SignalScoringEngine.WEIGHT_ALIGNMENT+SignalScoringEngine.WEIGHT_ENTRY);}
+ @Test public void missingTimeframesCannotEmitBuyOrSell(){long n=1800000000000L;SignalScoringEngine.Input in=new SignalScoringEngine.Input(Collections.emptyMap(),Collections.emptyMap(),Collections.emptyMap(),Collections.emptyMap(),Collections.emptyMap(),true,true,n,n,2000,2000.2,.2,.8);SignalScoringEngine.Result r=new SignalScoringEngine().evaluateDirection(in,SignalScoringEngine.Direction.BUY);assertNotEquals(SignalScoringEngine.Status.BUY,r.status);assertNotEquals(SignalScoringEngine.Status.SELL,r.status);assertFalse(r.rejectedReasons.isEmpty());}
+}

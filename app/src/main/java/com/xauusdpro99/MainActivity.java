@@ -19,13 +19,18 @@ import com.xauusdpro99.data.indicator.IndicatorEngine;
 import com.xauusdpro99.data.pattern.CandlePatternEngine;
 import com.xauusdpro99.data.structure.MarketStructureEngine;
 import com.xauusdpro99.data.structure.SupplyDemandEngine;
+import com.xauusdpro99.data.signal.SignalScoringEngine;
 
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.Map;
 
 public final class MainActivity extends Activity implements BiquoteConnectionEngine.Listener, MultiTimeframeEngine.Listener {
-    private TextView price, bidAsk, timestamp, status, source, log, candleSummary, indicatorSummary, patternSummary, structureSummary, supplySummary;
+    private TextView price, bidAsk, timestamp, status, source, log, candleSummary, indicatorSummary, patternSummary, structureSummary, supplySummary, signalSummary;
+    private volatile BiquoteConnectionEngine.Status connectionStatus = BiquoteConnectionEngine.Status.DISCONNECTED;
+    private volatile BiquoteTick latestTick;
+    private volatile long latestQuoteReceivedAtMs;
+    private final SignalScoringEngine signalEngine = new SignalScoringEngine();
     private BiquoteConnectionEngine engine;
     private MultiTimeframeEngine candleEngine;
 
@@ -56,6 +61,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         patternSummary = text("CANDLE PATTERN ENGINE: menunggu candle tertutup yang valid.", 12, 0xFFE0E0E0);
         structureSummary = text("MARKET STRUCTURE: menunggu data.", 12, 0xFFE0E0E0);
         supplySummary = text("SUPPLY / DEMAND: menunggu data.", 12, 0xFFE0E0E0);
+        signalSummary = text("MULTI-TIMEFRAME SIGNAL SCORING: menunggu data valid dari 12 timeframe.", 13, 0xFFFFFFFF);
         log = text("Log koneksi dan candle…", 12, 0xFFB0BEC5);
 
         root.addView(title, matchWrap());
@@ -81,6 +87,9 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         ScrollView supplyScroll = new ScrollView(this);
         supplyScroll.addView(supplySummary);
         root.addView(supplyScroll, new LinearLayout.LayoutParams(-1, 0, 2));
+        ScrollView signalScroll = new ScrollView(this);
+        signalScroll.addView(signalSummary);
+        root.addView(signalScroll, new LinearLayout.LayoutParams(-1, 0, 3));
         ScrollView logScroll = new ScrollView(this);
         logScroll.addView(log);
         root.addView(logScroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -101,10 +110,13 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     }
 
     @Override public void onStatus(BiquoteConnectionEngine.Status value, String detail) {
+        connectionStatus = value;
         status.setText(value.name() + " — " + detail);
     }
 
     @Override public void onTick(BiquoteTick tick, long receivedAt, Long sourceAt) {
+        latestTick = tick;
+        latestQuoteReceivedAtMs = receivedAt;
         price.setText(String.format(java.util.Locale.US, "%.2f", tick.mid));
         bidAsk.setText("Bid: " + fmt(tick.bid) + "    Ask: " + fmt(tick.ask)
                 + "    Spread: " + fmt(tick.spread != null ? tick.spread
@@ -131,9 +143,11 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
 
             CandleEngine.Snapshot daily = snapshots.get(CandleTimeframe.D1);
             IndicatorEngine indicatorEngine = new IndicatorEngine();
+            java.util.Map<CandleTimeframe, IndicatorEngine.Result> indicatorResults = new java.util.EnumMap<>(CandleTimeframe.class);
             StringBuilder indicators = new StringBuilder("INDICATORS (closed candles only)\n");
             for (CandleTimeframe tf : CandleTimeframe.values()) {
                 IndicatorEngine.Result r = indicatorEngine.calculate(snapshots.get(tf), daily, System.currentTimeMillis());
+                indicatorResults.put(tf, r);
                 indicators.append("\n").append(tf).append(" | ").append(r.validity)
                         .append(" | bias=").append(r.bias)
                         .append(" | momentum=").append(r.momentumDirection)
@@ -162,12 +176,15 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
 
             MarketStructureEngine structureEngine = new MarketStructureEngine();
             SupplyDemandEngine supplyEngine = new SupplyDemandEngine();
+            java.util.Map<CandleTimeframe, MarketStructureEngine.Result> structureResults = new java.util.EnumMap<>(CandleTimeframe.class);
+            java.util.Map<CandleTimeframe, SupplyDemandEngine.Result> supplyResults = new java.util.EnumMap<>(CandleTimeframe.class);
             StringBuilder structures = new StringBuilder("MARKET STRUCTURE — CLOSED CANDLES ONLY\n");
             StringBuilder supplies = new StringBuilder("SUPPLY / DEMAND — NO FIBONACCI\n");
             java.util.Map<CandleTimeframe, java.util.List<CandlePatternEngine.PriceZone>> zonesByTf = new java.util.EnumMap<>(CandleTimeframe.class);
             for (CandleTimeframe tf : CandleTimeframe.values()) {
                 CandleEngine.Snapshot snap = snapshots.get(tf);
                 MarketStructureEngine.Result ms = structureEngine.analyze(snap, System.currentTimeMillis());
+                structureResults.put(tf, ms);
                 structures.append("\n").append(tf).append(" | trend=").append(ms.trend).append(" | ").append(ms.validity).append("\n");
                 structures.append("Last swing high=").append(ms.lastSwingHigh == null ? "--" : ms.lastSwingHigh.label + " " + fmt(ms.lastSwingHigh.price) + " confirmed " + DateFormat.getDateTimeInstance().format(new Date(ms.lastSwingHigh.confirmedAtMs)))
                         .append(" | low=").append(ms.lastSwingLow == null ? "--" : ms.lastSwingLow.label + " " + fmt(ms.lastSwingLow.price) + " confirmed " + DateFormat.getDateTimeInstance().format(new Date(ms.lastSwingLow.confirmedAtMs))).append("\n");
@@ -175,6 +192,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                 Candle latest = snap == null || snap.closed.isEmpty() ? null : snap.closed.get(snap.closed.size()-1);
                 double current = latest == null ? 0d : latest.close;
                 SupplyDemandEngine.Result sd = supplyEngine.analyze(snap, current, System.currentTimeMillis());
+                supplyResults.put(tf, sd);
                 java.util.List<CandlePatternEngine.PriceZone> patternZones = new java.util.ArrayList<>();
                 supplies.append("\n").append(tf).append(" | ").append(sd.validity).append("\n");
                 for (SupplyDemandEngine.Zone z : sd.zones) {
@@ -189,6 +207,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                 for (SupplyDemandEngine.Breakout e : sd.breakouts) supplies.append(e.type).append(" level=").append(fmt(e.level)).append(" close=").append(fmt(e.close)).append(" retest=").append(e.retest).append(" ").append(e.note).append("\n");
                 zonesByTf.put(tf, patternZones);
             }
+            java.util.Map<CandleTimeframe, java.util.List<CandlePatternEngine.Pattern>> patternResults = new java.util.EnumMap<>(CandleTimeframe.class);
             StringBuilder patterns = new StringBuilder("CANDLE PATTERNS — closed OHLC only\n");
             CandlePatternEngine patternEngine = new CandlePatternEngine();
             for (CandleTimeframe tf : CandleTimeframe.values()) {
@@ -199,6 +218,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                         : indicatorEngine.calculate(snapshots.get(higherTf), daily, System.currentTimeMillis());
                 CandlePatternEngine.Context context = new CandlePatternEngine.Context(same, higher, zonesByTf.get(tf));
                 java.util.List<CandlePatternEngine.Pattern> detected = patternEngine.detect(snap, context, System.currentTimeMillis());
+                patternResults.put(tf, detected);
                 patterns.append("\n").append(tf).append(" | ");
                 if (detected.isEmpty()) {
                     patterns.append("NO CONFIRMED PATTERN / DATA NOT LIVE\n");
@@ -216,7 +236,44 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             }
             patternSummary.setText(patterns.toString());
             structureSummary.setText(structures.toString());
-            supplySummary.setText(supplies.toString());
+             supplySummary.setText(supplies.toString());
+
+            BiquoteTick tick = latestTick;
+            boolean quoteValid = tick != null && tick.isValidFor("XAUUSD")
+                    && !Boolean.TRUE.equals(tick.stale)
+                    && !"closed".equalsIgnoreCase(tick.marketState)
+                    && (tick.quoteAgeSeconds == null || tick.quoteAgeSeconds <= 300);
+            double bidValue = tick == null || tick.bid == null ? Double.NaN : tick.bid;
+            double askValue = tick == null || tick.ask == null ? Double.NaN : tick.ask;
+            double spreadValue = tick == null ? Double.NaN : (tick.spread != null ? tick.spread
+                    : (tick.ask != null && tick.bid != null ? tick.ask - tick.bid : Double.NaN));
+            SignalScoringEngine.Input scoringInput = new SignalScoringEngine.Input(
+                    snapshots, indicatorResults, structureResults, supplyResults, patternResults,
+                    connectionStatus == BiquoteConnectionEngine.Status.LIVE, quoteValid,
+                    latestQuoteReceivedAtMs, System.currentTimeMillis(), bidValue, askValue,
+                    spreadValue, SignalScoringEngine.DEFAULT_MAX_SPREAD);
+            StringBuilder signals = new StringBuilder("SIGNAL QUALITY — SKOR BUKAN PROBABILITAS WINRATE\n");
+            for (SignalScoringEngine.Result result : signalEngine.evaluate(scoringInput)) {
+                signals.append("\n").append(result.direction).append(" | SCORE ")
+                        .append(result.totalScore).append("/100 | ").append(result.quality)
+                        .append(" | FINAL ").append(result.status).append("\n");
+                signals.append("Pattern: ").append(result.patternName)
+                        .append(" | Entry=").append(fmt(result.entry))
+                        .append(" | SL=").append(fmt(result.stopLoss))
+                        .append(" | Target=").append(fmt(result.target))
+                        .append(" | RR=").append(fmt(result.riskReward))
+                        .append(" | Spread=").append(fmt(result.spread)).append("\n");
+                for (SignalScoringEngine.Component component : result.components)
+                    signals.append(component.name).append(": ").append(component.points).append("/")
+                            .append(component.weight).append(" — ").append(component.explanation).append("\n");
+                for (SignalScoringEngine.Conflict conflict : result.conflicts)
+                    signals.append("CONFLICT ").append(conflict.timeframe).append(" [").append(conflict.role)
+                            .append("]: ").append(conflict.explanation).append("\n");
+                for (String reason : result.acceptedReasons) signals.append("OK: ").append(reason).append("\n");
+                for (String reason : result.rejectedReasons) signals.append("BLOCK: ").append(reason).append("\n");
+            }
+            signals.append("\nCatatan: sinyal entry hanya boleh BUY/SELL jika seluruh 12 timeframe LIVE dan semua hard gate lolos.");
+            signalSummary.setText(signals.toString());
         });
     }
 
