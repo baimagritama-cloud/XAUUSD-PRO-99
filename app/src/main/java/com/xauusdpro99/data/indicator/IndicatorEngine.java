@@ -118,7 +118,8 @@ public final class IndicatorEngine {
 
         boolean enoughForAll = bars.size() >= 200 && rsi != null && mom != null && adx != null
                 && e10 != null && e20 != null && e50 != null && e100 != null && e200 != null
-                && tenkan != null && kijun != null && spanB != null && atrValue != null;
+                && tenkan != null && kijun != null && spanB != null && atrValue != null
+                && pivots.p != null;
         String detail = enoughForAll ? "VALID CLOSED OHLC"
                 : "NOT ENOUGH DATA untuk satu atau lebih indikator; nilai yang sudah memenuhi periode tetap ditampilkan";
         return new Result(tf, enoughForAll ? Validity.LIVE : Validity.NOT_ENOUGH_DATA, detail, nowMs, bars.size(),
