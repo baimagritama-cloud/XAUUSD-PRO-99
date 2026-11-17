@@ -89,9 +89,6 @@ public final class IndicatorEngine {
             if (bars.get(i).openTimeMs <= bars.get(i-1).openTimeMs)
                 return Result.unavailable(tf, Validity.UNAVAILABLE, "DUPLICATE/UNSORTED CANDLE TIMESTAMPS", nowMs, bars.size());
         }
-        if (bars.size() < 200)
-            return Result.unavailable(tf, Validity.NOT_ENOUGH_DATA, "EMA200 requires at least 200 valid closed candles", nowMs, bars.size());
-
         double[] close = new double[bars.size()], high = new double[bars.size()], low = new double[bars.size()];
         for (int i=0;i<bars.size();i++) { close[i]=bars.get(i).close; high[i]=bars.get(i).high; low[i]=bars.get(i).low; }
         int last=bars.size()-1;
@@ -119,7 +116,12 @@ public final class IndicatorEngine {
         Strength strength=adx==null?Strength.NOT_ENOUGH_DATA:(adx.adx>=25?Strength.STRONG:(adx.adx>=20?Strength.MODERATE:Strength.WEAK));
         Volatility vol=atrVsAverage==null?Volatility.NOT_ENOUGH_DATA:(atrVsAverage<0.8?Volatility.LOW:(atrVsAverage>1.2?Volatility.HIGH:Volatility.NORMAL));
 
-        return new Result(tf, Validity.LIVE, "VALID CLOSED OHLC", nowMs, bars.size(),
+        boolean enoughForAll = bars.size() >= 200 && rsi != null && mom != null && adx != null
+                && e10 != null && e20 != null && e50 != null && e100 != null && e200 != null
+                && tenkan != null && kijun != null && spanB != null && atrValue != null;
+        String detail = enoughForAll ? "VALID CLOSED OHLC"
+                : "NOT ENOUGH DATA untuk satu atau lebih indikator; nilai yang sudah memenuhi periode tetap ditampilkan";
+        return new Result(tf, enoughForAll ? Validity.LIVE : Validity.NOT_ENOUGH_DATA, detail, nowMs, bars.size(),
                 rsi,mom, adx==null?null:adx.adx, adx==null?null:adx.plusDi, adx==null?null:adx.minusDi,
                 e10,e20,e50,e100,e200,tenkan,kijun,spanA,spanB,atrValue,atrPercent,atrVsAverage,
                 pivots.p,pivots.r1,pivots.r2,pivots.r3,pivots.s1,pivots.s2,pivots.s3,
@@ -212,7 +214,8 @@ public final class IndicatorEngine {
         PivotValues(Double p,Double r1,Double r2,Double r3,Double s1,Double s2,Double s3){this.p=p;this.r1=r1;this.r2=r2;this.r3=r3;this.s1=s1;this.s2=s2;this.s3=s3;}
     }
     private static PivotValues pivots(CandleEngine.Snapshot daily,long now) {
-        if(daily==null || daily.closed.isEmpty())return new PivotValues(null,null,null,null,null,null,null);
+        if(daily==null || daily.sourceStatus != CandleEngine.SourceStatus.LIVE || daily.closed.isEmpty())
+            return new PivotValues(null,null,null,null,null,null,null);
         Candle prev=daily.closed.get(daily.closed.size()-1);
         if(prev==null || prev.isOpen || !prev.isClosedAt(now) || !CandleEngine.isValid(prev,now))return new PivotValues(null,null,null,null,null,null,null);
         double p=(prev.high+prev.low+prev.close)/3d, range=prev.high-prev.low;
