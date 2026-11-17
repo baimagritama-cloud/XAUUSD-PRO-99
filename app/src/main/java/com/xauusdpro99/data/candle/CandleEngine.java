@@ -52,7 +52,7 @@ public final class CandleEngine {
     public CandleEngine(CandleTimeframe timeframe) { this.timeframe = timeframe; }
 
     public synchronized void markUnavailable(String reason) {
-        kind = DataKind.UNAVAILABLE;
+        if (lastResponseAtMs == 0) kind = DataKind.UNAVAILABLE;
         source = reason == null ? "Tidak tersedia" : reason;
     }
 
@@ -111,9 +111,15 @@ public final class CandleEngine {
             if (list.get(i).openTimeMs - list.get(i - 1).openTimeMs > timeframe.durationMs) gaps++;
         }
         long freshnessLimit = Math.max(120_000L, timeframe.durationMs * 2L);
+        boolean responseFresh = nowMs >= lastResponseAtMs && nowMs - lastResponseAtMs <= freshnessLimit;
+        boolean candleFresh = running != null && running.openTimeMs <= nowMs && running.closeTimeMs() > nowMs;
+        if (!candleFresh && !list.isEmpty()) {
+            Candle lastClosed = list.get(list.size() - 1);
+            candleFresh = nowMs - lastClosed.closeTimeMs() <= freshnessLimit;
+        }
         SourceStatus status = kind == DataKind.UNAVAILABLE || lastResponseAtMs == 0
                 ? SourceStatus.UNAVAILABLE
-                : (nowMs - lastResponseAtMs <= freshnessLimit ? SourceStatus.LIVE : SourceStatus.STALE);
+                : (responseFresh && candleFresh ? SourceStatus.LIVE : SourceStatus.STALE);
         return new Snapshot(timeframe, list, running, kind, status, source,
                 lastResponseAtMs, latest, rejectedCount, gaps);
     }
@@ -125,6 +131,8 @@ public final class CandleEngine {
         if (c.high < c.open || c.high < c.close || c.low > c.open || c.low > c.close || c.high < c.low) return false;
         if (c.openTimeMs <= 0 || c.openTimeMs > nowMs || !c.timeframe.isAligned(c.openTimeMs)) return false;
         if (c.volume < 0 || c.tickVolume < 0) return false;
+        if (c.isOpen && c.closeTimeMs() <= nowMs) return false;
+        if (!c.isOpen && c.closeTimeMs() > nowMs) return false;
         return c.closeTimeMs() > c.openTimeMs;
     }
 }
