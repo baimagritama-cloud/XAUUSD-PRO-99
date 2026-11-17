@@ -51,7 +51,8 @@ public class IndicatorEngineTest {
         List<Candle> bars=rising(120);
         IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),null,NOW);
         assertEquals(Validity.NOT_ENOUGH_DATA,r.validity);
-        assertNull(r.rsi14);
+        assertNotNull(r.rsi14);
+        assertNotNull(r.momentum14);
         assertNull(r.ema200);
     }
 
