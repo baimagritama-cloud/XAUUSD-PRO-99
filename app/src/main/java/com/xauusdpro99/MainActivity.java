@@ -115,32 +115,32 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
 
             CandleEngine.Snapshot daily = snapshots.get(CandleTimeframe.D1);
             IndicatorEngine indicatorEngine = new IndicatorEngine();
-            StringBuilder indicators = new StringBuilder("INDICATORS (closed candles only)\\n");
+            StringBuilder indicators = new StringBuilder("INDICATORS (closed candles only)\n");
             for (CandleTimeframe tf : CandleTimeframe.values()) {
                 IndicatorEngine.Result r = indicatorEngine.calculate(snapshots.get(tf), daily, System.currentTimeMillis());
-                indicators.append("\\n").append(tf).append(" | ").append(r.validity)
+                indicators.append("\n").append(tf).append(" | ").append(r.validity)
                         .append(" | bias=").append(r.bias)
                         .append(" | momentum=").append(r.momentumDirection)
                         .append(" | trend=").append(r.trendStrength)
                         .append(" | volatility=").append(r.volatility)
                         .append(" | bars=").append(r.closedBars)
-                        .append(" | updated=").append(DateFormat.getDateTimeInstance().format(new Date(r.updatedAtMs))).append("\\n")
+                        .append(" | updated=").append(DateFormat.getDateTimeInstance().format(new Date(r.updatedAtMs))).append("\n")
                         .append("RSI14=").append(fmt(r.rsi14)).append(" MOM14=").append(fmt(r.momentum14))
                         .append(" ADX14=").append(fmt(r.adx14)).append(" +DI=").append(fmt(r.plusDi14))
-                        .append(" -DI=").append(fmt(r.minusDi14)).append("\\n")
+                        .append(" -DI=").append(fmt(r.minusDi14)).append("\n")
                         .append("EMA10/20/50/100/200=").append(fmt(r.ema10)).append("/")
                         .append(fmt(r.ema20)).append("/").append(fmt(r.ema50)).append("/")
-                        .append(fmt(r.ema100)).append("/").append(fmt(r.ema200)).append("\\n")
+                        .append(fmt(r.ema100)).append("/").append(fmt(r.ema200)).append("\n")
                         .append("Tenkan/Kijun/SpanA/SpanB=").append(fmt(r.tenkan9)).append("/")
                         .append(fmt(r.kijun26)).append("/").append(fmt(r.senkouA)).append("/")
                         .append(fmt(r.senkouB52)).append(" ATR14=").append(fmt(r.atr14))
-                        .append(" ATR%=").append(fmt(r.atrPercent)).append("\\n")
+                        .append(" ATR%=").append(fmt(r.atrPercent)).append("\n")
                         .append("Pivot/R1/R2/R3/S1/S2/S3=").append(fmt(r.pivot)).append("/")
                         .append(fmt(r.r1)).append("/").append(fmt(r.r2)).append("/").append(fmt(r.r3)).append("/")
-                        .append(fmt(r.s1)).append("/").append(fmt(r.s2)).append("/").append(fmt(r.s3)).append("\\n")
+                        .append(fmt(r.s1)).append("/").append(fmt(r.s2)).append("/").append(fmt(r.s3)).append("\n")
                         .append("Swing S=").append(r.swingSupports.toString())
-                        .append(" R=").append(r.swingResistances.toString()).append("\\n")
-                        .append(r.validityDetail).append("\\n");
+                        .append(" R=").append(r.swingResistances.toString()).append("\n")
+                        .append(r.validityDetail).append("\n");
             }
             indicatorSummary.setText(indicators.toString());
         });

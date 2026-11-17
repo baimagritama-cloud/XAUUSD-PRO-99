@@ -39,8 +39,8 @@ public class IndicatorEngineTest {
 
     @Test public void momentumUsesMtStyle100BaselineAndRsiUsesWilder() {
         List<Candle> bars=rising(220);
-        IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),null,NOW);
-        assertEquals(Validity.LIVE,r.validity);
+        IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),daily(),NOW);
+        assertEquals(IndicatorEngine.Validity.LIVE,r.validity);
         assertEquals(319d/305d*100d,r.momentum14,0.000001); // Close[last] / Close[last-14] * 100
         assertEquals(100d,r.rsi14,0.000001);
     }
@@ -58,7 +58,7 @@ public class IndicatorEngineTest {
     @Test public void returnsNotEnoughDataInsteadOfPlaceholders() {
         List<Candle> bars=rising(120);
         IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),null,NOW);
-        assertEquals(Validity.NOT_ENOUGH_DATA,r.validity);
+        assertEquals(IndicatorEngine.Validity.NOT_ENOUGH_DATA,r.validity);
         assertNotNull(r.rsi14);
         assertNotNull(r.momentum14);
         assertNull(r.ema200);
