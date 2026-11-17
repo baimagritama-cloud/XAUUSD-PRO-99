@@ -21,18 +21,22 @@ import com.xauusdpro99.data.structure.MarketStructureEngine;
 import com.xauusdpro99.data.structure.SupplyDemandEngine;
 import com.xauusdpro99.data.signal.SignalScoringEngine;
 import com.xauusdpro99.data.signal.SignalFrequencyController;
+import com.xauusdpro99.data.signal.EntryRiskEngine;
+import com.xauusdpro99.data.signal.MarketJourneyEngine;
 
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.Map;
 
 public final class MainActivity extends Activity implements BiquoteConnectionEngine.Listener, MultiTimeframeEngine.Listener {
-    private TextView price, bidAsk, timestamp, status, source, log, candleSummary, indicatorSummary, patternSummary, structureSummary, supplySummary, signalSummary;
+    private TextView price, bidAsk, timestamp, status, source, log, candleSummary, indicatorSummary, patternSummary, structureSummary, supplySummary, signalSummary, entryRiskSummary, marketJourneySummary;
     private volatile BiquoteConnectionEngine.Status connectionStatus = BiquoteConnectionEngine.Status.DISCONNECTED;
     private volatile BiquoteTick latestTick;
     private volatile long latestQuoteReceivedAtMs;
     private final SignalScoringEngine signalEngine = new SignalScoringEngine();
     private final SignalFrequencyController frequencyController = new SignalFrequencyController();
+    private final EntryRiskEngine entryRiskEngine = new EntryRiskEngine();
+    private final MarketJourneyEngine marketJourneyEngine = new MarketJourneyEngine();
     private BiquoteConnectionEngine engine;
     private MultiTimeframeEngine candleEngine;
 
@@ -64,6 +68,8 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         structureSummary = text("MARKET STRUCTURE: menunggu data.", 12, 0xFFE0E0E0);
         supplySummary = text("SUPPLY / DEMAND: menunggu data.", 12, 0xFFE0E0E0);
         signalSummary = text("MULTI-TIMEFRAME SIGNAL SCORING: menunggu data valid dari 12 timeframe.", 13, 0xFFFFFFFF);
+        entryRiskSummary = text("ENTRY / RISK PLAN: menunggu data tervalidasi.", 13, 0xFFFFFFFF);
+        marketJourneySummary = text("MARKET JOURNEY: menunggu quote dan level aktual.", 13, 0xFFFFFFFF);
         log = text("Log koneksi dan candle…", 12, 0xFFB0BEC5);
 
         root.addView(title, matchWrap());
@@ -92,6 +98,10 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         ScrollView signalScroll = new ScrollView(this);
         signalScroll.addView(signalSummary);
         root.addView(signalScroll, new LinearLayout.LayoutParams(-1, 0, 3));
+        ScrollView riskScroll = new ScrollView(this); riskScroll.addView(entryRiskSummary);
+        root.addView(riskScroll, new LinearLayout.LayoutParams(-1, 0, 2));
+        ScrollView journeyScroll = new ScrollView(this); journeyScroll.addView(marketJourneySummary);
+        root.addView(journeyScroll, new LinearLayout.LayoutParams(-1, 0, 3));
         ScrollView logScroll = new ScrollView(this);
         logScroll.addView(log);
         root.addView(logScroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -283,6 +293,49 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             signals.append("\n").append(frequencyController.report(System.currentTimeMillis()));
             signals.append("\nCatatan: 12 kandidat/hari adalah target evaluasi, bukan kuota. Batas skor 57 dan seluruh hard gate tetap wajib. Statistik performa belum tersedia tanpa hasil historis/outcome tervalidasi.");
             signalSummary.setText(signals.toString());
+
+            StringBuilder riskText = new StringBuilder("ENTRY / STOP LOSS / TAKE PROFIT — LEVEL TEKNIS AKTUAL\\n");
+            for (SignalScoringEngine.Result scored : scoredResults) {
+                EntryRiskEngine.Result plan = entryRiskEngine.calculate(new EntryRiskEngine.Input(scored,
+                        snapshots, indicatorResults, structureResults, supplyResults, patternResults,
+                        bidValue, askValue, spreadValue, tick == null ? Double.NaN : tick.mid,
+                        latestQuoteReceivedAtMs, System.currentTimeMillis(),
+                        connectionStatus == BiquoteConnectionEngine.Status.LIVE, quoteValid));
+                riskText.append("\\n").append(scored.direction).append(" | SCORE ").append(scored.totalScore)
+                        .append(" | ").append(plan.summary).append("\\nEntry=").append(fmt(plan.entry))
+                        .append(" SL=").append(fmt(plan.stopLoss)).append(" Risk=").append(fmt(plan.riskDistance))
+                        .append(" ATR=").append(fmt(plan.atr)).append(" RR=").append(fmt(plan.riskReward)).append("\\n");
+                for (EntryRiskEngine.Target t : plan.targets)
+                    riskText.append(t.label).append("=").append(fmt(t.price)).append(" | ").append(t.timeframe)
+                            .append(" | ").append(t.source).append(" | RR=").append(fmt(t.riskReward)).append("\\n");
+                for (String reason : plan.acceptedReasons) riskText.append("OK: ").append(reason).append("\\n");
+                for (String reason : plan.rejectedReasons) riskText.append("BLOCK: ").append(reason).append("\\n");
+            }
+            entryRiskSummary.setText(riskText.toString());
+
+            MarketJourneyEngine.Result journey = marketJourneyEngine.analyze(new MarketJourneyEngine.Input(
+                    tick == null ? Double.NaN : tick.mid, bidValue, askValue, spreadValue,
+                    connectionStatus == BiquoteConnectionEngine.Status.LIVE, quoteValid,
+                    latestQuoteReceivedAtMs, System.currentTimeMillis(), snapshots,
+                    indicatorResults, structureResults, supplyResults, patternResults));
+            StringBuilder journeyText = new StringBuilder("MARKET JOURNEY — DATA AKTUAL\\n");
+            journeyText.append("Harga=").append(fmt(journey.currentPrice)).append(" | Arah=").append(journey.mainDirection)
+                    .append(" | State=").append(journey.state).append(" | Area=").append(journey.safety)
+                    .append("\\nPosisi=").append(journey.position).append("\\nDemand=").append(journey.nearestDemand)
+                    .append("\\nSupply=").append(journey.nearestSupply).append("\\nTujuan=").append(journey.nextDestination)
+                    .append("\\nArea Aman=").append(journey.safeArea).append("\\nArea Waspada=").append(journey.cautionArea)
+                    .append("\\nSkenario bullish:\\n");
+            for (String s : journey.bullishScenario) journeyText.append("• ").append(s).append("\\n");
+            journeyText.append("Pembatalan bullish: ").append(journey.cancellationBullish).append("\\nSkenario bearish:\\n");
+            for (String s : journey.bearishScenario) journeyText.append("• ").append(s).append("\\n");
+            journeyText.append("Pembatalan bearish: ").append(journey.cancellationBearish).append("\\nPotensi reversal:\\n");
+            for (String s : journey.reversalNotes) journeyText.append("• ").append(s).append("\\n");
+            for (MarketJourneyEngine.Level l : journey.nearbyLevels)
+                journeyText.append(l.type).append(" ").append(l.timeframe).append(" ").append(l.label)
+                        .append(" [").append(fmt(l.lower)).append("–").append(fmt(l.upper))
+                        .append("] distance=").append(fmt(l.distance)).append("\\n");
+            if (!journey.dataValid) journeyText.append("DATA INVALID — skenario ditahan sampai quote LIVE valid.\\n");
+            marketJourneySummary.setText(journeyText.toString());
         });
     }
 
