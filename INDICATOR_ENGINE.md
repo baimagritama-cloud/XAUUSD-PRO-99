@@ -37,7 +37,7 @@
 - If some indicators have enough data while others do not, valid metrics remain visible and only unavailable metrics show NOT ENOUGH DATA. Overall timeframe validity is NOT_ENOUGH_DATA until the full required set is available.
 
 ## Reference comparison
-- MetaTrader 5 RSI calculation and interpretation: https://www.metatrader5.com/en/terminal/help/indicators/oscillators/rsi
+- MetaTrader 5 Momentum calculation (Close[t] / Close[t-n] × 100): https://www.metatrader5.com/en/terminal/help/indicators/oscillators/momentum\n- MetaTrader 5 RSI calculation and interpretation: https://www.metatrader5.com/en/terminal/help/indicators/oscillators/rsi
 - MetaTrader 5 Wilder ADX, DI and True Range calculations: https://www.metatrader5.com/en/terminal/help/indicators/trend_indicators/admiw
 - TradingView RSI / Wilder RMA explanation: https://www.tradingview.com/support/solutions/43000502338-relative-strength-index-rsi/
 - TradingView Traditional Pivot Point formulas: https://www.tradingview.com/support/solutions/43000521824-pivot-points-standard/
