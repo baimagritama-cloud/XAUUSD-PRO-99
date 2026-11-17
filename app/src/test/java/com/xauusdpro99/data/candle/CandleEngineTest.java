@@ -22,7 +22,7 @@ public class CandleEngineTest {
         CandleEngine engine = new CandleEngine(CandleTimeframe.M1);
         engine.replaceFromServer(Arrays.asList(
                 candle(CandleTimeframe.M1, t, 10, 12, 9, 11, false),
-                candle(CandleTimeframe.M1, t + 60_000L, 11, 13, 10, 12, true)), NOW, "test");
+                candle(CandleTimeframe.M1, t + 120_000L, 11, 13, 10, 12, true)), NOW, "test");
         CandleEngine.Snapshot s = engine.snapshot(NOW);
         assertEquals(1, s.closed.size());
         assertNotNull(s.running);
