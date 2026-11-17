@@ -47,7 +47,7 @@ public class IndicatorEngineTest {
 
     @Test public void ema200AndAtrAreCalculatedFromClosedBars() {
         List<Candle> bars=rising(220);
-        IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),null,NOW);
+        IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),daily(),NOW);
         assertNotNull(r.ema200);
         assertEquals(2d,r.atr14,0.000001);
         assertEquals(100d,r.adx14,0.000001);
@@ -57,7 +57,7 @@ public class IndicatorEngineTest {
 
     @Test public void returnsNotEnoughDataInsteadOfPlaceholders() {
         List<Candle> bars=rising(120);
-        IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),null,NOW);
+        IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),daily(),NOW);
         assertEquals(IndicatorEngine.Validity.NOT_ENOUGH_DATA,r.validity);
         assertNotNull(r.rsi14);
         assertNotNull(r.momentum14);
@@ -66,7 +66,7 @@ public class IndicatorEngineTest {
 
     @Test public void ichimokuUsesCurrentClosedWindow() {
         List<Candle> bars=rising(220);
-        IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),null,NOW);
+        IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),daily(),NOW);
         assertNotNull(r.tenkan9);
         assertNotNull(r.kijun26);
         assertNotNull(r.senkouB52);
