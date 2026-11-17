@@ -279,7 +279,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                         .append(" | Entry=").append(fmt(result.entry))
                         .append(" | SL=").append(fmt(result.stopLoss))
                         .append(" | Target=").append(fmt(result.target))
-                        .append(" | RR=").append(fmt(result.rr))
+                        .append(" | RR=").append(fmt(result.riskReward))
                         .append(" | Spread=").append(fmt(result.spread)).append("\n");
                 for (SignalScoringEngine.Component component : result.components)
                     signals.append(component.name).append(": ").append(component.points).append("/")
