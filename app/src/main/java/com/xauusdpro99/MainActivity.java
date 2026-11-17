@@ -20,6 +20,7 @@ import com.xauusdpro99.data.pattern.CandlePatternEngine;
 import com.xauusdpro99.data.structure.MarketStructureEngine;
 import com.xauusdpro99.data.structure.SupplyDemandEngine;
 import com.xauusdpro99.data.signal.SignalScoringEngine;
+import com.xauusdpro99.data.signal.SignalFrequencyController;
 
 import java.text.DateFormat;
 import java.util.Date;
