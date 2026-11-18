@@ -4,16 +4,13 @@ import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 
-import androidx.test.core.app.ActivityScenario;
-import androidx.test.rule.GrantPermissionRule;
-
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
+import androidx.test.uiautomator.Until;
 
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -21,10 +18,7 @@ import java.io.File;
 
 @RunWith(AndroidJUnit4.class)
 public final class SixPageUiTest {
-    @Rule
-    public final GrantPermissionRule notificationPermission =
-        GrantPermissionRule.grant(android.Manifest.permission.POST_NOTIFICATIONS);
-
+    private static final String PACKAGE = "com.xauusdpro99";
     private static final String[] PAGES = {
         "LIVE CHART", "MARKET JOURNEY", "INDICATOR CENTER",
         "SIGNAL CENTER", "NEWS", "NOTIFICATIONS"
@@ -32,18 +26,37 @@ public final class SixPageUiTest {
 
     @Test
     public void navigateAllPagesAndCapturePortraitLandscapeScreenshots() throws Exception {
-        try (ActivityScenario<MainActivity> ignored = ActivityScenario.launch(MainActivity.class)) {
         UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         File output = new File(context.getExternalFilesDir(null), "ui-screenshots");
         if (!output.exists() && !output.mkdirs()) {
             throw new AssertionError("Cannot create screenshot directory: " + output);
         }
+        File debug = new File(output, "debug");
+        if (!debug.exists() && !debug.mkdirs()) {
+            throw new AssertionError("Cannot create UI debug directory: " + debug);
+        }
 
+        // Start from the launcher, grant the runtime permission before app startup,
+        // and explicitly launch the real Activity instead of binding ActivityScenario
+        // to a second instrumentation lifecycle.
+        device.pressHome();
         device.setOrientationPortrait();
-        device.waitForIdle();
+        device.executeShellCommand("pm grant " + PACKAGE + " android.permission.POST_NOTIFICATIONS");
+        device.executeShellCommand("am force-stop " + PACKAGE);
+        device.executeShellCommand("am start -W -n " + PACKAGE + "/.MainActivity");
 
-        // Exercise the live-chart controls before collecting the page evidence.
+        boolean appVisible = device.wait(Until.hasObject(By.pkg(PACKAGE)), 60_000);
+        UiObject2 refresh = waitForText(device, "REFRESH", 60_000);
+        if (!appVisible || refresh == null) {
+            device.takeScreenshot(new File(debug, "initial-screen.png"));
+            device.dumpWindowHierarchy(new File(debug, "initial-hierarchy.xml"));
+            throw new AssertionError("App/control not visible. foreground="
+                + device.getCurrentPackageName() + ", appVisible=" + appVisible
+                + ", REFRESH found=" + (refresh != null));
+        }
+
+        // Exercise live-chart controls before collecting page evidence.
         click(device, "REFRESH");
         click(device, "REFRESH OHLC");
         click(device, "M1");
@@ -51,11 +64,11 @@ public final class SixPageUiTest {
         click(device, "INDICATOR: RSI14");
         device.waitForIdle();
 
-        captureAllPages(device, output, "portrait");
+        captureAllPages(device, output, "portrait", debug);
 
         device.setOrientationLandscape();
         device.waitForIdle();
-        captureAllPages(device, output, "landscape");
+        captureAllPages(device, output, "landscape", debug);
 
         device.setOrientationNatural();
         device.waitForIdle();
@@ -69,27 +82,37 @@ public final class SixPageUiTest {
         }
         for (String name : expected) {
             File screenshot = new File(output, name);
-            assertTrue("Missing or empty screenshot: " + screenshot, screenshot.isFile() && screenshot.length() > 0);
-        }
+            assertTrue("Missing or empty screenshot: " + screenshot,
+                screenshot.isFile() && screenshot.length() > 0);
         }
     }
 
-    private static void captureAllPages(UiDevice device, File output, String orientation) throws Exception {
+    private static UiObject2 waitForText(UiDevice device, String text, long timeoutMs) {
+        By selector = By.text(text);
+        if (!device.wait(Until.hasObject(selector), timeoutMs)) return null;
+        return device.findObject(selector);
+    }
+
+    private static void captureAllPages(UiDevice device, File output, String orientation, File debug) throws Exception {
         for (String page : PAGES) {
-            UiObject2 nav = device.findObject(By.text(page));
+            UiObject2 nav = waitForText(device, page, 10_000);
             if (nav == null) {
-                // Reveal later tabs; the strip may still be scrolled to the end after rotation.
                 int y = Math.max(80, device.getDisplayHeight() / 12);
                 device.swipe(device.getDisplayWidth() - 40, y, 40, y, 25);
                 device.waitForIdle();
-                nav = device.findObject(By.text(page));
+                nav = waitForText(device, page, 3_000);
                 if (nav == null) {
                     device.swipe(40, y, device.getDisplayWidth() - 40, y, 25);
                     device.waitForIdle();
-                    nav = device.findObject(By.text(page));
+                    nav = waitForText(device, page, 3_000);
                 }
             }
-            if (nav == null) throw new AssertionError("Navigation tab not found: " + page);
+            if (nav == null) {
+                device.takeScreenshot(new File(debug, orientation + "_missing_" + page.replace(' ', '_') + ".png"));
+                device.dumpWindowHierarchy(new File(debug, orientation + "_missing_" + page.replace(' ', '_') + ".xml"));
+                throw new AssertionError("Navigation tab not found: " + page
+                    + "; foreground=" + device.getCurrentPackageName());
+            }
             nav.click();
             device.waitForIdle();
             String anchor = page.equals("MARKET JOURNEY") ? "MARKET JOURNEY"
@@ -98,7 +121,9 @@ public final class SixPageUiTest {
                 : page.equals("NEWS") ? "ECONOMIC CALENDAR"
                 : page.equals("NOTIFICATIONS") ? "VOICE ENGINE & NOTIFICATION CENTER"
                 : "XAUUSD PRO 99";
-            if (device.findObject(By.textContains(anchor)) == null) {
+            if (!device.wait(Until.hasObject(By.textContains(anchor)), 10_000)) {
+                device.takeScreenshot(new File(debug, orientation + "_missing_content_" + page.replace(' ', '_') + ".png"));
+                device.dumpWindowHierarchy(new File(debug, orientation + "_missing_content_" + page.replace(' ', '_') + ".xml"));
                 throw new AssertionError("Page content not visible after navigation: " + page);
             }
             if (page.equals("NEWS")) {
@@ -115,15 +140,16 @@ public final class SixPageUiTest {
     }
 
     private static void click(UiDevice device, String text) {
-        UiObject2 control = device.findObject(By.text(text));
-        if (control == null) throw new AssertionError("Expected clickable control not found: " + text);
+        UiObject2 control = waitForText(device, text, 15_000);
+        if (control == null) throw new AssertionError("Expected control not found: " + text
+            + "; foreground=" + device.getCurrentPackageName());
         control.click();
         device.waitForIdle();
     }
 
     private static void clickOneOf(UiDevice device, String first, String second) {
-        UiObject2 control = device.findObject(By.text(first));
-        if (control == null) control = device.findObject(By.text(second));
+        UiObject2 control = waitForText(device, first, 5_000);
+        if (control == null) control = waitForText(device, second, 5_000);
         if (control == null) throw new AssertionError("Neither toggle state was found: " + first + " / " + second);
         control.click();
         device.waitForIdle();
