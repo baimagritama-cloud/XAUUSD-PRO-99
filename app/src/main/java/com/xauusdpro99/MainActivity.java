@@ -262,6 +262,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     @Override public void onStatus(BiquoteConnectionEngine.Status value, String detail) {
         connectionStatus = value;
         status.setText(value.name() + " — " + detail);
+        status.setTextColor(value==BiquoteConnectionEngine.Status.LIVE?0xFF20C997:value==BiquoteConnectionEngine.Status.STALE?0xFFFF6677:0xFFFFC857);
     }
 
     @Override public void onTick(BiquoteTick tick, long receivedAt, Long sourceAt) {
