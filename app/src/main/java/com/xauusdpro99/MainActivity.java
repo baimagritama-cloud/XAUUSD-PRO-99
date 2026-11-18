@@ -12,6 +12,7 @@ import android.os.Bundle;
 import android.widget.EditText;
 import android.widget.Toast;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -185,16 +186,16 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         livePage.addView(candleSummary,matchWrap());
         addPage(livePage);
 
-        LinearLayout journeyPage=scrollPage();journeyPage.addView(marketJourneySummary,matchWrap());journeyPage.addView(supplySummary,matchWrap());journeyPage.addView(structureSummary,matchWrap());addPage(journeyPage);
-        LinearLayout indicatorPage=scrollPage();indicatorPage.addView(indicatorSummary,matchWrap());addPage(indicatorPage);
-        LinearLayout signalPage=scrollPage();signalPage.addView(signalSummary,matchWrap());signalPage.addView(entryRiskSummary,matchWrap());addPage(signalPage);
+        LinearLayout journeyPage=scrollPage();journeyPage.addView(marketJourneySummary,matchWrap());journeyPage.addView(supplySummary,matchWrap());journeyPage.addView(structureSummary,matchWrap());addScrollPage(journeyPage);
+        LinearLayout indicatorPage=scrollPage();indicatorPage.addView(indicatorSummary,matchWrap());addScrollPage(indicatorPage);
+        LinearLayout signalPage=scrollPage();signalPage.addView(signalSummary,matchWrap());signalPage.addView(entryRiskSummary,matchWrap());addScrollPage(signalPage);
         LinearLayout newsPage=scrollPage();newsPage.addView(text("ECONOMIC CALENDAR",15,0xFFFFFFFF),matchWrap());
         Button configureCalendar=new Button(this);configureCalendar.setText("ATUR SUMBER KALENDER EKONOMI");configureCalendar.setOnClickListener(v->configureCalendarEndpoint());newsPage.addView(configureCalendar,matchWrap());
         Button refreshCalendar=new Button(this);refreshCalendar.setText("REFRESH ECONOMIC CALENDAR");refreshCalendar.setOnClickListener(v->fetchEconomicCalendar());newsPage.addView(refreshCalendar,matchWrap());
-        newsPage.addView(economicNewsSummary,matchWrap());addPage(newsPage);
+        newsPage.addView(economicNewsSummary,matchWrap());addScrollPage(newsPage);
         LinearLayout notificationPage=scrollPage();addNotificationControls(notificationPage);addMonitoringControls(notificationPage);
         notificationPage.addView(text("RIWAYAT ALERT PASAR",15,0xFFFFFFFF),matchWrap());notificationPage.addView(alertSummary,matchWrap());
-        notificationPage.addView(text("LOG KONEKSI",15,0xFFFFFFFF),matchWrap());notificationPage.addView(log,matchWrap());addPage(notificationPage);
+        notificationPage.addView(text("LOG KONEKSI",15,0xFFFFFFFF),matchWrap());notificationPage.addView(log,matchWrap());addScrollPage(notificationPage);
         showPage(0);
         setContentView(root);
         requestNotificationPermission();
@@ -219,8 +220,9 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     }
 
 
-    private LinearLayout scrollPage(){LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(8,8,8,20);ScrollView scroll=new ScrollView(this);scroll.setFillViewport(false);scroll.addView(content);LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.addView(scroll,new LinearLayout.LayoutParams(-1,-1));return page;}
+    private LinearLayout scrollPage(){LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(8,8,8,20);return content;}
     private void addPage(View page){appPages.add(page);pageHost.addView(page,new LinearLayout.LayoutParams(-1,-1));}
+    private void addScrollPage(LinearLayout content){ScrollView scroll=new ScrollView(this);scroll.setFillViewport(false);scroll.addView(content);LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.addView(scroll,new LinearLayout.LayoutParams(-1,-1));addPage(page);}
     private void showPage(int index){for(int i=0;i<appPages.size();i++)appPages.get(i).setVisibility(i==index?View.VISIBLE:View.GONE);}
     private void updateChartFromSnapshots(){
         if(chartView==null)return;CandleEngine.Snapshot snap=latestSnapshots.get(selectedTimeframe);
