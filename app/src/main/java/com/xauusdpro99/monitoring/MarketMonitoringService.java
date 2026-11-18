@@ -56,7 +56,7 @@ public final class MarketMonitoringService extends Service
         if(Build.VERSION.SDK_INT>=26)c.startForegroundService(i);else c.startService(i);
     }
     public static void stop(Context c) {
-        c.startService(new Intent(c,MarketMonitoringService.class).setAction(ACTION_STOP));
+        c.stopService(new Intent(c,MarketMonitoringService.class));
     }
     @Override public void onCreate(){
         super.onCreate();
@@ -73,13 +73,15 @@ public final class MarketMonitoringService extends Service
         quoteEngine.connect();
         candleEngine.refreshAll();
         scheduler.scheduleAtFixedRate(()->{
-            if(!stopping)write("service_heartbeat_at",System.currentTimeMillis());
+            if(!stopping){
+                long now=System.currentTimeMillis();
+                write("service_heartbeat_at",now);
+                dispatchCalendarAlerts(now);
+            }
         },0,30,TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(()->{
             if(stopping)return;
             candleEngine.refreshAll();
-            dispatchCalendarAlerts(System.currentTimeMillis());
-            pollCalendar();
             refreshFreshness();
         },2,2,TimeUnit.MINUTES);
         scheduler.scheduleAtFixedRate(this::pollCalendar,1,15,TimeUnit.MINUTES);
@@ -265,6 +267,7 @@ public final class MarketMonitoringService extends Service
         });
     }
     private void dispatchCalendarAlerts(long nowMs){
+        news.markStale(nowMs);
         for(EconomicNewsEngine.Alert a:news.evaluateAlerts(nowMs)){
             SharedPreferences np=getSharedPreferences("notification_settings",MODE_PRIVATE);
             Set<String> types=np.getStringSet("alert_types",null);

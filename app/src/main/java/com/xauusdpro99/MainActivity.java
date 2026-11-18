@@ -94,6 +94,21 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     private int cooldownMinutes=5, quietStartMinute=1320, quietEndMinute=420;
     private final Set<String> enabledAlertTypes=new HashSet<>();
 
+    @Override protected void onResume(){
+        super.onResume();
+        refreshMonitoringStatus();
+    }
+    private void refreshMonitoringStatus(){
+        if(monitoringStatus==null)return;
+        SharedPreferences p=getSharedPreferences("monitoring_runtime",MODE_PRIVATE);
+        boolean running=p.getBoolean("service_running",false);
+        String service=p.getString("service_status","UNKNOWN");
+        String conn=p.getString("connection_status","UNKNOWN");
+        monitoringStatus.setText("SERVICE: "+service+" | CONNECTION: "+conn
+            +" | MONITOR: "+p.getString("monitoring_status","Menunggu data")
+            +" | "+(running?"heartbeat "+DateFormat.getTimeInstance().format(new Date(p.getLong("service_heartbeat_at",0))):"Service belum berjalan"));
+        if(monitoringButton!=null)monitoringButton.setText("BACKGROUND MONITORING: "+(running?"RUNNING":"NOT RUNNING"));
+    }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         monitoringPrefs=getSharedPreferences("monitoring_settings",MODE_PRIVATE);
@@ -190,9 +205,17 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         setContentView(root);
         requestNotificationPermission();
         if(backgroundMonitoring){
-            MarketMonitoringService.start(this);
-            monitoringStatus.setText("FOREGROUND SERVICE: DIMINTA — status aktual tersedia pada notifikasi persisten");
-            monitoringButton.setText("BACKGROUND MONITORING: AKTIF");
+            try{
+                MarketMonitoringService.start(this);
+                monitoringStatus.setText("FOREGROUND SERVICE: START REQUESTED — menunggu status service");
+                monitoringButton.setText("BACKGROUND MONITORING: STARTING");
+            }catch(RuntimeException ex){
+                backgroundMonitoring=false;
+                monitoringPrefs.edit().putBoolean("background_monitor_enabled",false).apply();
+                engine=new BiquoteConnectionEngine(this);candleEngine=new MultiTimeframeEngine(this);engine.connect();
+                monitoringStatus.setText("SERVICE GAGAL DIMULAI: "+ex.getClass().getSimpleName());
+                monitoringButton.setText("BACKGROUND MONITORING: NONAKTIF");
+            }
         }else{
             engine.connect();
             monitoringStatus.setText("BACKGROUND MONITORING: NONAKTIF — koneksi hanya selama layar aplikasi aktif");
@@ -484,9 +507,17 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             if(engine!=null){engine.disconnect();engine=null;}
             if(candleEngine!=null){candleEngine.close();candleEngine=null;}
             backgroundMonitoring=true;
-            MarketMonitoringService.start(this);
-            monitoringStatus.setText("FOREGROUND SERVICE: START REQUESTED — periksa notifikasi persisten");
-            monitoringButton.setText("BACKGROUND MONITORING: AKTIF");
+            try{
+                MarketMonitoringService.start(this);
+                monitoringStatus.setText("FOREGROUND SERVICE: START REQUESTED — periksa notifikasi persisten");
+                monitoringButton.setText("BACKGROUND MONITORING: STARTING");
+            }catch(RuntimeException ex){
+                backgroundMonitoring=false;
+                monitoringPrefs.edit().putBoolean("background_monitor_enabled",false).apply();
+                engine=new BiquoteConnectionEngine(this);candleEngine=new MultiTimeframeEngine(this);engine.connect();
+                monitoringStatus.setText("SERVICE GAGAL DIMULAI: "+ex.getClass().getSimpleName());
+                monitoringButton.setText("BACKGROUND MONITORING: NONAKTIF");
+            }
         }else{
             MarketMonitoringService.stop(this);
             monitoringPrefs.edit().putBoolean("background_monitor_enabled",false).apply();
