@@ -21,7 +21,9 @@ public final class MarketAlertEngine {
    candles=c;indicators=i;structures=s;zones=z;patterns=p;signals=g;nowMs=n;
   }
  }
- private final Map<String,Long> processed=new HashMap<>(),emitted=new HashMap<>();\n private long cooldownMs=COOLDOWN_MS;\n public synchronized void setCooldownMinutes(int minutes){cooldownMs=Math.max(0,Math.min(1440,minutes))*60000L;}
+ private final Map<String,Long> processed=new HashMap<>(),emitted=new HashMap<>();
+ private long cooldownMs=COOLDOWN_MS;
+ public synchronized void setCooldownMinutes(int minutes){cooldownMs=Math.max(0,Math.min(1440,minutes))*60000L;}
  private final Map<String,Cross> pending=new HashMap<>();
  private static final class Cross {final boolean bull;final long time;Cross(boolean b,long t){bull=b;time=t;}}
  public synchronized List<Alert> evaluate(Input in){
