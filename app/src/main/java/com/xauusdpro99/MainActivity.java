@@ -586,8 +586,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
 
     private static String newsValue(String value){return value==null||value.trim().isEmpty()?"DATA UNAVAILABLE":value;}
     private static String safeCalendarSource(String sourceUrl) {
-        if(sourceUrl==null||sourceUrl.trim().isEmpty())return "Belum dikonfigurasi";
-        int q=sourceUrl.indexOf('?');return q<0?sourceUrl:sourceUrl.substring(0,q)+"?[credentials hidden]";
+        return sourceUrl==null||sourceUrl.trim().isEmpty()?"Belum dikonfigurasi":sourceUrl;
     }
     private static String formatCountdown(long ms) {
         long sec=Math.max(0,ms/1000);return String.format(java.util.Locale.US,"%02d hari %02d:%02d:%02d",
