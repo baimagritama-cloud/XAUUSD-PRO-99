@@ -28,11 +28,11 @@ public final class EconomicNewsEngine {
         public final String id, name, country, source;
         public final long releaseAtMs, updatedAtMs;
         public final Impact impact;
-        public final Double previous, forecast, actual;
+        public final String previous, forecast, actual;
         public final EventStatus status;
         Event(String id, String name, String country, String source, long releaseAtMs,
-              long updatedAtMs, Impact impact, Double previous, Double forecast,
-              Double actual, EventStatus status) {
+              long updatedAtMs, Impact impact, String previous, String forecast,
+              String actual, EventStatus status) {
             this.id=id; this.name=name; this.country=country; this.source=source;
             this.releaseAtMs=releaseAtMs; this.updatedAtMs=updatedAtMs; this.impact=impact;
             this.previous=previous; this.forecast=forecast; this.actual=actual; this.status=status;
@@ -91,19 +91,20 @@ public final class EconomicNewsEngine {
                 if(name==null || !isUsdCountry(country) || !isRelevant(name)) continue;
                 Long time=parseTime(str(o,"Date","date","datetime","Time","time"));
                 if(time==null) continue;
-                String id=first(str(o,"CalendarId","calendarId","id","Ticker","ticker"),
+                String id=first(str(o,"CalendarId","CalendarID","calendarId","id","Ticker","ticker"),
                         country+"|"+name+"|"+time);
-                Double previous=num(o,"Previous","previous");
-                Double forecast=num(o,"Forecast","forecast");
-                Double actual=num(o,"Actual","actual");
+                String releaseSource=first(str(o,"Source","source"),sourceUrl);
+                String previous=value(o,"Previous","previous");
+                String forecast=value(o,"Forecast","forecast");
+                String actual=value(o,"Actual","actual");
                 String importance=str(o,"Importance","importance","Impact","impact");
                 Impact impact=parseImpact(importance);
                 String rawStatus=str(o,"Status","status");
-                EventStatus status=actual!=null?EventStatus.RELEASED:
+                EventStatus status=actual!=null&&!actual.trim().isEmpty()?EventStatus.RELEASED:
                         (rawStatus!=null&&rawStatus.toLowerCase(Locale.US).contains("cancel")?EventStatus.CANCELLED:
                         (time>=nowMs?EventStatus.SCHEDULED:EventStatus.UNKNOWN));
                 Long update=parseTime(str(o,"LastUpdate","lastUpdate","Updated","updated"));
-                parsed.add(new Event(id,name,country,host,time,update==null?nowMs:update,impact,
+                parsed.add(new Event(id,name,country,releaseSource,time,update==null?nowMs:update,impact,
                         previous,forecast,actual,status));
             }
             Collections.sort(parsed,(a,b)->Long.compare(a.releaseAtMs,b.releaseAtMs));
@@ -150,7 +151,7 @@ public final class EconomicNewsEngine {
                 add(out,e,AlertKind.MINUTES_30);
             if(Math.abs(e.releaseAtMs-nowMs)<=30_000L)
                 add(out,e,AlertKind.RELEASE);
-            if(e.actual!=null && e.releaseAtMs<=nowMs+60_000L)
+            if(e.actual!=null && !e.actual.trim().isEmpty() && e.releaseAtMs<=nowMs+60_000L)
                 add(out,e,AlertKind.ACTUAL_AVAILABLE);
         }
         return out;
@@ -194,7 +195,10 @@ public final class EconomicNewsEngine {
     }
     private static Impact parseImpact(String s){if(s==null)return Impact.UNKNOWN;String v=s.toLowerCase(Locale.US);if(v.contains("3")||v.contains("high"))return Impact.HIGH;if(v.contains("2")||v.contains("medium"))return Impact.MEDIUM;if(v.contains("1")||v.contains("low"))return Impact.LOW;return Impact.UNKNOWN;}
     private static String str(JsonObject o,String...keys){for(String k:keys)if(o.has(k)&&!o.get(k).isJsonNull())return o.get(k).getAsString();return null;}
-    private static Double num(JsonObject o,String...keys){String s=str(o,keys);if(s==null||s.trim().isEmpty()||s.equalsIgnoreCase("null")||s.equalsIgnoreCase("n/a"))return null;try{String v=s.replace(",","").replace("%","").trim();return Double.isFinite(Double.parseDouble(v))?Double.parseDouble(v):null;}catch(Exception e){return null;}}
+    private static String value(JsonObject o,String...keys){
+        String s=str(o,keys); if(s==null)return null; s=s.trim();
+        return s.isEmpty()||s.equalsIgnoreCase("null")||s.equalsIgnoreCase("n/a")||s.equals("--")?null:s;
+    }
     private static String first(String a,String b){return a==null||a.trim().isEmpty()?b:a;}
     private static Long parseTime(String s){
         if(s==null||s.trim().isEmpty())return null;

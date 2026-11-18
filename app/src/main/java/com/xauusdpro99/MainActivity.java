@@ -482,7 +482,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         input.setHint("https://.../calendar.json");
         input.setText(calendarEndpoint);
         new AlertDialog.Builder(this).setTitle("Sumber kalender ekonomi (HTTPS JSON)")
-            .setMessage("Masukkan endpoint kalender berizin yang mengembalikan array JSON. Mendukung field Country, Event, Date, Importance, Previous, Forecast, Actual. Jika kosong, dashboard tetap DATA UNAVAILABLE.")
+            .setMessage("Trading Economics API (perlu API key/akses provider): https://api.tradingeconomics.com/calendar/country/united%20states?c=API_KEY&f=json. Tempel endpoint HTTPS lengkap. Field nilai disimpan sebagai teks asli agar satuan %, K, M, B tidak hilang. Jika belum ada akses/endpoint, dashboard tetap DATA UNAVAILABLE.")
             .setView(input).setPositiveButton("SIMPAN",(d,w)->{
                 calendarEndpoint=input.getText().toString().trim();
                 newsPrefs.edit().putString("calendar_endpoint",calendarEndpoint).apply();
@@ -557,8 +557,8 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         for(EconomicNewsEngine.Alert a:economicNewsEngine.evaluateAlerts(nowMs)) {
             EconomicNewsEngine.Event e=a.event;
             String summary="Negara "+e.country+". Waktu "+DateFormat.getDateTimeInstance().format(new Date(e.releaseAtMs))
-                +". Impact "+e.impact+". Previous "+fmt(e.previous)+". Forecast "+fmt(e.forecast)
-                +". Actual "+fmt(e.actual)+". Sumber "+safeCalendarSource(e.source);
+                +". Impact "+e.impact+". Previous "+newsValue(e.previous)+". Forecast "+newsValue(e.forecast)
+                +". Actual "+newsValue(e.actual)+". Sumber rilis "+e.source+". Kalender "+safeCalendarSource(economicNewsEngine.getSource());
             deliverEconomicAlert(a.title(),summary,e.releaseAtMs,a.key());
         }
     }
@@ -578,6 +578,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             voiceEngine.speakAlert("NEWS_ALERT","NEWS",Double.NaN,headline+". "+summary,"INFO",fresh);
     }
 
+    private static String newsValue(String value){return value==null||value.trim().isEmpty()?"DATA UNAVAILABLE":value;}
     private static String safeCalendarSource(String sourceUrl) {
         if(sourceUrl==null||sourceUrl.trim().isEmpty())return "Belum dikonfigurasi";
         int q=sourceUrl.indexOf('?');return q<0?sourceUrl:sourceUrl.substring(0,q)+"?[credentials hidden]";
