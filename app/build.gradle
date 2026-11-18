@@ -9,6 +9,7 @@ android {
         targetSdk 35
         versionCode 1
         versionName '1.0'
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -19,6 +20,11 @@ android {
 
 dependencies {
     testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test:rules:1.6.1'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.3.0'
     implementation 'com.microsoft.signalr:signalr:8.0.33'
     implementation 'com.google.code.gson:gson:2.13.2'
     implementation 'org.slf4j:slf4j-jdk14:1.7.36'
