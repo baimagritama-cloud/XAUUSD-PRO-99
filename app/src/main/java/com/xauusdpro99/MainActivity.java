@@ -1,7 +1,15 @@
 package com.xauusdpro99;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.TimePickerDialog;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
+import android.widget.EditText;
+import android.widget.Toast;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -24,6 +32,13 @@ import com.xauusdpro99.data.signal.SignalScoringEngine;
 import com.xauusdpro99.data.signal.SignalFrequencyController;
 import com.xauusdpro99.data.signal.EntryRiskEngine;
 import com.xauusdpro99.data.signal.MarketJourneyEngine;
+import com.xauusdpro99.voice.VoiceEngine;
+import com.xauusdpro99.notification.NotificationCenter;
+import com.xauusdpro99.notification.NotificationPolicy;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import java.text.DateFormat;
 import java.util.Date;
@@ -41,11 +56,23 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     private final MarketAlertEngine marketAlertEngine = new MarketAlertEngine();
     private BiquoteConnectionEngine engine;
     private MultiTimeframeEngine candleEngine;
+    private VoiceEngine voiceEngine;
+    private NotificationCenter notificationCenter;
+    private final NotificationPolicy notificationPolicy = new NotificationPolicy();
+    private SharedPreferences notificationPrefs;
+    private TextView voiceStatus;
+    private boolean notificationsEnabled=true, voiceEnabled=true, quietEnabled=false;
+    private int cooldownMinutes=5, quietStartMinute=1320, quietEndMinute=420;
+    private final Set<String> enabledAlertTypes=new HashSet<>();
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         engine = new BiquoteConnectionEngine(this);
         candleEngine = new MultiTimeframeEngine(this);
+        notificationCenter = new NotificationCenter(this);
+        notificationPrefs = getSharedPreferences("notification_settings", MODE_PRIVATE);
+        loadNotificationSettings();
+        voiceEngine = new VoiceEngine(this, message -> runOnUiThread(() -> { if (voiceStatus != null) voiceStatus.setText("VOICE: " + message); }));
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(24, 24, 24, 24);
@@ -83,6 +110,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         root.addView(source, matchWrap());
         root.addView(refresh, matchWrap());
         root.addView(refreshCandles, matchWrap());
+        addNotificationControls(root);
         ScrollView candleScroll = new ScrollView(this);
         candleScroll.addView(candleSummary);
         root.addView(candleScroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -111,6 +139,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         logScroll.addView(log);
         root.addView(logScroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
+        requestNotificationPermission();
         engine.connect();
     }
 
@@ -302,11 +331,13 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                     snapshots, indicatorResults, structureResults, supplyResults, patternResults, scoredResults, System.currentTimeMillis()));
             StringBuilder alertText = new StringBuilder("EMA20/EMA50 + MARKET ALERT — CLOSED CANDLES ONLY\\n");
             if (alerts.isEmpty()) alertText.append("Belum ada peristiwa baru yang memenuhi syarat.\\n");
-            for (MarketAlertEngine.Alert a : alerts) alertText.append(a.type).append(" | TF=").append(a.timeframe)
-                    .append(" | Harga=").append(fmt(a.price)).append(" | Waktu=")
-                    .append(DateFormat.getDateTimeInstance().format(new Date(a.timestampMs))).append(" | ").append(a.status)
+            boolean freshForAudio=quoteValid&&connectionStatus==BiquoteConnectionEngine.Status.LIVE&&latestQuoteReceivedAtMs>0&&System.currentTimeMillis()-latestQuoteReceivedAtMs<=15000L;
+            for(MarketAlertEngine.Alert a:alerts){
+                alertText.append(a.type).append(" | TF=").append(a.timeframe).append(" | Harga=").append(fmt(a.price)).append(" | Waktu=").append(DateFormat.getDateTimeInstance().format(new Date(a.timestampMs))).append(" | ").append(a.status)
                     .append("\\nAlasan: ").append(a.reason).append("\\nInvalidasi: ").append(a.invalidation).append("\\n\\n");
-            alertText.append("Timeframe: M1 M2 M3 M5 M15 M30 H1 H4 H8 H12 D1 W1 | cooldown 5 menit.");
+                deliverAlert(a,freshForAudio);
+            }
+            alertText.append("Timeframe: M1 M2 M3 M5 M15 M30 H1 H4 H8 H12 D1 W1 | cooldown ").append(cooldownMinutes).append(" menit.");
             alertSummary.setText(alertText.toString());
 
             StringBuilder riskText = new StringBuilder("ENTRY / STOP LOSS / TAKE PROFIT — LEVEL TEKNIS AKTUAL\\n");
@@ -370,9 +401,50 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
 
     private String fmt(Double value) { return value == null ? "NOT ENOUGH DATA" : String.format(java.util.Locale.US, "%.2f", value); }
 
+
+    private void loadNotificationSettings(){
+        notificationsEnabled=notificationPrefs.getBoolean("notifications_enabled",true);voiceEnabled=notificationPrefs.getBoolean("voice_enabled",true);quietEnabled=notificationPrefs.getBoolean("quiet_enabled",false);
+        cooldownMinutes=notificationPrefs.getInt("cooldown_minutes",5);quietStartMinute=notificationPrefs.getInt("quiet_start",1320);quietEndMinute=notificationPrefs.getInt("quiet_end",420);
+        Set<String> saved=notificationPrefs.getStringSet("alert_types",null);if(saved==null)for(MarketAlertEngine.Type t:MarketAlertEngine.Type.values())enabledAlertTypes.add(t.name());else enabledAlertTypes.addAll(saved);
+        marketAlertEngine.setCooldownMinutes(cooldownMinutes);
+    }
+    private void saveNotificationSettings(){
+        notificationPrefs.edit().putBoolean("notifications_enabled",notificationsEnabled).putBoolean("voice_enabled",voiceEnabled).putBoolean("quiet_enabled",quietEnabled)
+            .putInt("cooldown_minutes",cooldownMinutes).putInt("quiet_start",quietStartMinute).putInt("quiet_end",quietEndMinute).putStringSet("alert_types",new HashSet<>(enabledAlertTypes)).apply();
+        marketAlertEngine.setCooldownMinutes(cooldownMinutes);
+    }
+    private void addNotificationControls(LinearLayout root){
+        root.addView(text("VOICE ENGINE & NOTIFICATION CENTER",16,0xFFFFFFFF),matchWrap());voiceStatus=text("VOICE: menyiapkan TextToSpeech…",12,0xFFFFD54F);root.addView(voiceStatus,matchWrap());
+        Button test=new Button(this);test.setText("TEST VOICE (BELL → SUARA)");test.setOnClickListener(v->{if(voiceEngine!=null)voiceEngine.testVoice();});root.addView(test,matchWrap());
+        Button voices=new Button(this);voices.setText("PILIH SUARA");voices.setOnClickListener(v->showVoiceChoices());root.addView(voices,matchWrap());
+        Button notif=new Button(this);notif.setText("NOTIFIKASI: "+(notificationsEnabled?"AKTIF":"NONAKTIF"));notif.setOnClickListener(v->{notificationsEnabled=!notificationsEnabled;saveNotificationSettings();notif.setText("NOTIFIKASI: "+(notificationsEnabled?"AKTIF":"NONAKTIF"));if(notificationsEnabled)requestNotificationPermission();});root.addView(notif,matchWrap());
+        Button sound=new Button(this);sound.setText("SUARA: "+(voiceEnabled?"AKTIF":"NONAKTIF"));sound.setOnClickListener(v->{voiceEnabled=!voiceEnabled;saveNotificationSettings();sound.setText("SUARA: "+(voiceEnabled?"AKTIF":"NONAKTIF"));});root.addView(sound,matchWrap());
+        Button types=new Button(this);types.setText("PILIH JENIS ALERT");types.setOnClickListener(v->showAlertTypes());root.addView(types,matchWrap());
+        Button cooldown=new Button(this);cooldown.setText("COOLDOWN: "+cooldownMinutes+" MENIT");cooldown.setOnClickListener(v->showCooldownDialog(cooldown));root.addView(cooldown,matchWrap());
+        Button quiet=new Button(this);quiet.setText("QUIET HOURS: "+(quietEnabled?"AKTIF":"NONAKTIF"));quiet.setOnClickListener(v->{quietEnabled=!quietEnabled;saveNotificationSettings();quiet.setText("QUIET HOURS: "+(quietEnabled?"AKTIF":"NONAKTIF"));});root.addView(quiet,matchWrap());
+        Button quietTime=new Button(this);quietTime.setText("ATUR JAM TENANG (DEFAULT 22:00–07:00)");quietTime.setOnClickListener(v->showQuietHoursDialog());root.addView(quietTime,matchWrap());
+        Button history=new Button(this);history.setText("RIWAYAT NOTIFIKASI");history.setOnClickListener(v->showNotificationHistory());root.addView(history,matchWrap());
+    }
+    private void requestNotificationPermission(){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},1101);}
+    @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){super.onRequestPermissionsResult(code,permissions,results);if(code==1101){boolean ok=results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED;Toast.makeText(this,ok?"Izin notifikasi diberikan":"Izin ditolak; riwayat tetap tersimpan di aplikasi",Toast.LENGTH_LONG).show();}}
+    private void showVoiceChoices(){List<String>x=voiceEngine==null?new ArrayList<>():voiceEngine.getVoiceNames();if(x.isEmpty()){Toast.makeText(this,"Daftar suara TTS belum tersedia",Toast.LENGTH_LONG).show();return;}new AlertDialog.Builder(this).setTitle("Pilih suara perangkat").setItems(x.toArray(new String[0]),(d,w)->voiceEngine.selectVoice(w)).show();}
+    private void showAlertTypes(){MarketAlertEngine.Type[] a=MarketAlertEngine.Type.values();String[] names=new String[a.length];boolean[] checked=new boolean[a.length];for(int i=0;i<a.length;i++){names[i]=a[i].name();checked[i]=enabledAlertTypes.contains(names[i]);}
+        new AlertDialog.Builder(this).setTitle("Jenis alert aktif").setMultiChoiceItems(names,checked,(d,w,on)->{if(on)enabledAlertTypes.add(names[w]);else enabledAlertTypes.remove(names[w]);}).setPositiveButton("SIMPAN",(d,w)->saveNotificationSettings()).setNegativeButton("BATAL",null).show();}
+    private void showCooldownDialog(Button b){EditText input=new EditText(this);input.setInputType(2);input.setText(Integer.toString(cooldownMinutes));new AlertDialog.Builder(this).setTitle("Cooldown (menit, 0–1440)").setView(input).setPositiveButton("SIMPAN",(d,w)->{try{cooldownMinutes=Math.max(0,Math.min(1440,Integer.parseInt(input.getText().toString())));saveNotificationSettings();b.setText("COOLDOWN: "+cooldownMinutes+" MENIT");}catch(NumberFormatException e){Toast.makeText(this,"Cooldown tidak valid",Toast.LENGTH_SHORT).show();}}).setNegativeButton("BATAL",null).show();}
+    private void showQuietHoursDialog(){new TimePickerDialog(this,(v,h,m)->{quietStartMinute=h*60+m;new TimePickerDialog(this,(v2,h2,m2)->{quietEndMinute=h2*60+m2;saveNotificationSettings();Toast.makeText(this,"Quiet hours tersimpan",Toast.LENGTH_SHORT).show();},quietEndMinute/60,quietEndMinute%60,true).show();},quietStartMinute/60,quietStartMinute%60,true).show();}
+    private void showNotificationHistory(){List<NotificationCenter.Item>x=notificationCenter.recent(50);if(x.isEmpty()){new AlertDialog.Builder(this).setMessage("Belum ada riwayat notifikasi.").setPositiveButton("OK",null).show();return;}String[] labels=new String[x.size()];for(int i=0;i<x.size();i++){NotificationCenter.Item a=x.get(i);labels[i]=(a.read?"DIBACA":"BARU")+" | "+DateFormat.getDateTimeInstance().format(new Date(a.timestampMs))+"\\n"+a.title+" — "+a.message;}
+        new AlertDialog.Builder(this).setTitle("Pilih item untuk tandai dibaca").setItems(labels,(d,w)->{notificationCenter.markRead(x.get(w).id);showNotificationHistory();}).setNeutralButton("TANDAI SEMUA DIBACA",(d,w)->{notificationCenter.markAllRead();Toast.makeText(this,"Riwayat ditandai dibaca",Toast.LENGTH_SHORT).show();}).setPositiveButton("TUTUP",null).show();}
+    private void deliverAlert(MarketAlertEngine.Alert a,boolean fresh){boolean typeOn=enabledAlertTypes.contains(a.type.name());if(!notificationPolicy.accept(a.type.name(),a.timeframe,System.currentTimeMillis(),fresh,typeOn,cooldownMinutes))return;
+        String title="XAUUSD — "+a.type.name()+" ("+a.timeframe+")",message="Harga "+fmt(a.price)+". "+a.reason;long id=notificationCenter.record(title,message,a.timestampMs);
+        boolean quiet=quietEnabled&&NotificationPolicy.isQuietHours(NotificationPolicy.currentMinuteOfDay(),quietStartMinute,quietEndMinute);
+        if(notificationsEnabled&&id>0)notificationCenter.show(this,id,title,message);if(voiceEnabled&&!quiet&&voiceEngine!=null)voiceEngine.speakAlert(a.type.name(),a.timeframe,a.price,a.reason,a.status,fresh);
+    }
+
     @Override protected void onDestroy() {
         if (engine != null) engine.disconnect();
         if (candleEngine != null) candleEngine.close();
+        if (voiceEngine != null) voiceEngine.shutdown();
+        if (notificationCenter != null) notificationCenter.close();
         super.onDestroy();
     }
 }
