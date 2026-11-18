@@ -1,5 +1,5 @@
 package com.xauusdpro99.voice;
-import android.content.Context;import android.media.AudioManager;import android.media.ToneGenerator;import android.os.Handler;import android.os.Looper;import android.speech.tts.TextToSpeech;import android.speech.tts.UtteranceProgressListener;import android.speech.tts.Voice;import java.util.*;
+import android.content.Context;import android.content.SharedPreferences;import android.media.AudioManager;import android.media.ToneGenerator;import android.os.Handler;import android.os.Looper;import android.speech.tts.TextToSpeech;import android.speech.tts.UtteranceProgressListener;import android.speech.tts.Voice;import java.util.*;
 /** Bell-first Indonesian TTS queue. Gender selection is best-effort because Android voice metadata is inconsistent. */
 public final class VoiceEngine implements TextToSpeech.OnInitListener {
  public interface Listener{void onVoiceStatus(String status);}
@@ -27,8 +27,8 @@ public final class VoiceEngine implements TextToSpeech.OnInitListener {
  }
  private void enqueue(String s){handler.post(()->{if(!closed){queue.offer(s);playNext();}});}
  private void playNext(){if(!ready||speaking||queue.isEmpty()||closed)return;String m=queue.poll();speaking=true;if(bell!=null)try{bell.startTone(ToneGenerator.TONE_PROP_BEEP,380);}catch(RuntimeException ignored){}
-  handler.postDelayed(()->{if(closed||tts==null){speaking=false;return;}if(tts.speak(m,TextToSpeech.QUEUE_FLUSH,null,"xauusd-"+System.nanoTime())==TextToSpeech.ERROR){speaking=false;update("TTS menolak pesan; periksa mesin dan data suara.");playNext();}},480L);
+  handler.postDelayed(()->{if(closed||tts==null){speaking=false;return;}if(tts.speak(m,TextToSpeech.QUEUE_FLUSH,null,"xauusd-"+System.nanoTime())==TextToSpeech.ERROR){speaking=false;update("TTS menolak pesan; periksa mesin dan data suara.");playNext();}else recordHistory(m);},480L);
  }
- private void update(String s){status=s;if(listener!=null)listener.onVoiceStatus(s);}
+ private void recordHistory(String message){SharedPreferences p=context.getSharedPreferences("voice_history",Context.MODE_PRIVATE);String old=p.getString("entries","");String line=java.text.DateFormat.getDateTimeInstance().format(new Date())+" | "+message;String[] rows=(old.isEmpty()?new String[0]:old.split("\\n"));StringBuilder out=new StringBuilder();for(int i=Math.max(0,rows.length-49);i<rows.length;i++){if(out.length()>0)out.append("\\n");out.append(rows[i]);}if(out.length()>0)out.append("\\n");out.append(line);p.edit().putString("entries",out.toString()).apply();}\n private void update(String s){status=s;if(listener!=null)listener.onVoiceStatus(s);}
  public void shutdown(){closed=true;handler.removeCallbacksAndMessages(null);queue.clear();if(bell!=null)bell.release();if(tts!=null){tts.stop();tts.shutdown();tts=null;}}
 }
