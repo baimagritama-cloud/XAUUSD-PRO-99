@@ -23,6 +23,8 @@ import com.xauusdpro99.data.news.EconomicCalendarClient;
 import com.xauusdpro99.data.news.CalendarCredentialStore;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
+import android.provider.Settings;
 import com.xauusdpro99.data.alert.MarketAlertEngine;
 import com.xauusdpro99.data.connection.BiquoteTick;
 import com.xauusdpro99.data.candle.Candle;
@@ -470,6 +472,8 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         monitoringButton.setText("BACKGROUND MONITORING: "+(backgroundMonitoring?"AKTIF":"NONAKTIF"));
         monitoringButton.setOnClickListener(v->toggleBackgroundMonitoring());
         root.addView(monitoringButton,matchWrap());
+        Button battery=new Button(this);battery.setText("PENGATURAN OPTIMASI BATERAI");
+        battery.setOnClickListener(v->openBatterySettings());root.addView(battery,matchWrap());
         Button logButton=new Button(this);logButton.setText("STATUS & LOG RECONNECT BACKGROUND");
         logButton.setOnClickListener(v->showMonitoringLog());root.addView(logButton,matchWrap());
         root.addView(text("Catatan: Force Stop menghentikan service. Restart perangkat tidak otomatis menyalakan live service; buka aplikasi untuk memulai lagi.",11,0xFFFFCC80),matchWrap());
@@ -494,12 +498,24 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             monitoringButton.setText("BACKGROUND MONITORING: NONAKTIF");
         }
     }
+    private void openBatterySettings(){
+        PowerManager pm=(PowerManager)getSystemService(POWER_SERVICE);
+        boolean exempt=Build.VERSION.SDK_INT<23||pm!=null&&pm.isIgnoringBatteryOptimizations(getPackageName());
+        new AlertDialog.Builder(this).setTitle("Optimasi baterai Android")
+            .setMessage(exempt?"Aplikasi saat ini dikecualikan dari optimasi baterai. Sistem tetap dapat menghentikan proses karena kebijakan lain."
+                :"Aplikasi mungkin dibatasi Doze/optimasi baterai. Anda dapat mengatur pengecualian secara manual; ini bukan jaminan service selalu hidup.")
+            .setPositiveButton("BUKA PENGATURAN",(d,w)->{
+                try{startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));}
+                catch(Exception e){startActivity(new Intent(Settings.ACTION_SETTINGS));}
+            }).setNegativeButton("TUTUP",null).show();
+    }
     private void showMonitoringLog(){
         SharedPreferences p=getSharedPreferences("monitoring_runtime",MODE_PRIVATE);
         String message="SERVICE: "+p.getString("service_status","UNKNOWN")
             +"\\nCONNECTION: "+p.getString("connection_status","UNKNOWN")
             +"\\nMONITOR: "+p.getString("monitoring_status","Belum ada update")
             +"\\nLAST TICK: "+DateFormat.getDateTimeInstance().format(new Date(p.getLong("last_tick_at",0)))
+            +"\\nHEARTBEAT: "+DateFormat.getDateTimeInstance().format(new Date(p.getLong("service_heartbeat_at",0)))
             +"\\nWORKMANAGER: "+p.getString("workmanager_status","Belum berjalan")
             +"\\nBOOT: "+p.getString("boot_status","Belum ada event restart")
             +"\\n\\nLOG RECONNECT:\\n"+p.getString("reconnect_log","Belum ada log");

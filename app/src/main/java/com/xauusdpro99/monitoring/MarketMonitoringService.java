@@ -73,6 +73,9 @@ public final class MarketMonitoringService extends Service
         quoteEngine.connect();
         candleEngine.refreshAll();
         scheduler.scheduleAtFixedRate(()->{
+            if(!stopping)write("service_heartbeat_at",System.currentTimeMillis());
+        },0,30,TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(()->{
             if(stopping)return;
             candleEngine.refreshAll();
             dispatchCalendarAlerts(System.currentTimeMillis());
