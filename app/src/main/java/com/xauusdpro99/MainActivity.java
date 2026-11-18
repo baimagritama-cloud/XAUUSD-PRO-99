@@ -435,9 +435,26 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     private void showNotificationHistory(){List<NotificationCenter.Item>x=notificationCenter.recent(50);if(x.isEmpty()){new AlertDialog.Builder(this).setMessage("Belum ada riwayat notifikasi.").setPositiveButton("OK",null).show();return;}String[] labels=new String[x.size()];for(int i=0;i<x.size();i++){NotificationCenter.Item a=x.get(i);labels[i]=(a.read?"DIBACA":"BARU")+" | "+DateFormat.getDateTimeInstance().format(new Date(a.timestampMs))+"\\n"+a.title+" — "+a.message;}
         new AlertDialog.Builder(this).setTitle("Pilih item untuk tandai dibaca").setItems(labels,(d,w)->{notificationCenter.markRead(x.get(w).id);showNotificationHistory();}).setNeutralButton("TANDAI SEMUA DIBACA",(d,w)->{notificationCenter.markAllRead();Toast.makeText(this,"Riwayat ditandai dibaca",Toast.LENGTH_SHORT).show();}).setPositiveButton("TUTUP",null).show();}
     private void deliverAlert(MarketAlertEngine.Alert a,boolean fresh){boolean typeOn=enabledAlertTypes.contains(a.type.name());if(!notificationPolicy.accept(a.type.name(),a.timeframe,System.currentTimeMillis(),fresh,typeOn,cooldownMinutes))return;
-        String title="XAUUSD — "+a.type.name()+" ("+a.timeframe+")",message="Harga "+fmt(a.price)+". "+a.reason;long id=notificationCenter.record(title,message,a.timestampMs);
+        String title="XAUUSD — "+a.type.name()+" ("+a.timeframe+")",message="Harga "+fmt(a.price)+". "+a.reason;
+        long id=notificationCenter.recordAlert(title,message,a.timestampMs,System.currentTimeMillis(),cooldownMinutes*60000L);
+        if(id<=0)return;
         boolean quiet=quietEnabled&&NotificationPolicy.isQuietHours(NotificationPolicy.currentMinuteOfDay(),quietStartMinute,quietEndMinute);
-        if(notificationsEnabled&&id>0)notificationCenter.show(this,id,title,message);if(voiceEnabled&&!quiet&&voiceEngine!=null)voiceEngine.speakAlert(a.type.name(),a.timeframe,a.price,a.reason,a.status,fresh);
+        if(notificationsEnabled)notificationCenter.show(this,id,title,message);
+        if(voiceEnabled&&!quiet&&voiceEngine!=null)voiceEngine.speakAlert(a.type.name(),a.timeframe,a.price,a.reason,a.status,fresh);
+    }
+
+    /** Entry point for a future economic-news provider; never publishes stale-market voice alerts. */
+    public void onNewsAlert(String headline,String summary,long timestampMs){
+        boolean fresh=latestTick!=null&&connectionStatus==BiquoteConnectionEngine.Status.LIVE
+                &&latestQuoteReceivedAtMs>0&&System.currentTimeMillis()-latestQuoteReceivedAtMs<=15000L
+                &&!Boolean.TRUE.equals(latestTick.stale)&&(latestTick.quoteAgeSeconds==null||latestTick.quoteAgeSeconds<=300);
+        if(!notificationPolicy.accept("NEWS_ALERT","NEWS",System.currentTimeMillis(),fresh,enabledAlertTypes.contains("NEWS_ALERT"),cooldownMinutes))return;
+        String title="XAUUSD — NEWS ALERT",message=String.valueOf(headline)+". "+String.valueOf(summary);
+        long id=notificationCenter.recordAlert(title,message,timestampMs,System.currentTimeMillis(),cooldownMinutes*60000L);
+        if(id<=0)return;
+        boolean quiet=quietEnabled&&NotificationPolicy.isQuietHours(NotificationPolicy.currentMinuteOfDay(),quietStartMinute,quietEndMinute);
+        if(notificationsEnabled)notificationCenter.show(this,id,title,message);
+        if(voiceEnabled&&!quiet&&voiceEngine!=null)voiceEngine.speakAlert("NEWS_ALERT","NEWS",Double.NaN,message,"INFO",fresh);
     }
 
     @Override protected void onDestroy() {
