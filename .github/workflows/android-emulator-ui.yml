@@ -31,34 +31,16 @@ jobs:
       - name: Run tests and collect screenshots while emulator is alive
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
-          target: google_apis
+          api-level: 34
+          target: default
           arch: x86_64
           profile: pixel_2
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-audio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           emulator-boot-timeout: 900
           script: |
-            mkdir -p artifacts/diagnostics artifacts/ui-screenshots
-            adb wait-for-device
-            adb shell getprop sys.boot_completed | grep -q '^1$'
-            adb shell service check package | grep -q found
-            adb shell service check activity | grep -q found
-            adb shell cmd package list packages >/dev/null
-            adb shell am get-current-user
-            adb logcat -c
-            test_result=0
-            gradle --no-daemon :app:connectedDebugAndroidTest || test_result=$?
-            adb logcat -d -v threadtime > artifacts/diagnostics/logcat.txt
-            adb shell dumpsys activity processes > artifacts/diagnostics/activity-processes.txt || true
-            adb shell dumpsys package com.xauusdpro99 > artifacts/diagnostics/app-package.txt || true
-            adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots || true
-            screenshot_count=$(find artifacts/ui-screenshots -maxdepth 1 -type f -name '*.png' | wc -l)
-            echo "Instrumentation exit code: $test_result"
-            echo "Screenshot count: $screenshot_count"
-            test "$test_result" -eq 0 && test "$screenshot_count" -eq 12
-            exit "$test_result"
-
+            sh -c 'mkdir -p artifacts/diagnostics artifacts/ui-screenshots; adb wait-for-device; adb shell getprop sys.boot_completed | grep -q "^1$" || exit 21; adb logcat -c; gradle --no-daemon :app:connectedDebugAndroidTest; result=$?; adb logcat -d -v threadtime > artifacts/diagnostics/logcat.txt; adb shell dumpsys activity processes > artifacts/diagnostics/activity-processes.txt 2>&1; adb shell dumpsys package com.xauusdpro99 > artifacts/diagnostics/app-package.txt 2>&1; adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots >/dev/null 2>&1 || true; count=$(find artifacts/ui-screenshots -type f -name "*.png" | wc -l); echo "Instrumentation exit code=$result; screenshot count=$count"; if [ "$result" -ne 0 ]; then exit "$result"; fi; [ "$count" -eq 12 ]'
+      
       - name: Upload UI screenshots and instrumentation diagnostics
         if: always()
         uses: actions/upload-artifact@v4
