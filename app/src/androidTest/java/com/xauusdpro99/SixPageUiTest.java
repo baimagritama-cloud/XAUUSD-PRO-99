@@ -7,6 +7,7 @@ import android.content.Context;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.By;
+import androidx.test.uiautomator.BySelector;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
@@ -88,7 +89,7 @@ public final class SixPageUiTest {
     }
 
     private static UiObject2 waitForText(UiDevice device, String text, long timeoutMs) {
-        By selector = By.text(text);
+        BySelector selector = By.text(text);
         if (!device.wait(Until.hasObject(selector), timeoutMs)) return null;
         return device.findObject(selector);
     }
