@@ -29,9 +29,16 @@ public final class VoiceEngine implements TextToSpeech.OnInitListener {
  private void playNext(){if(!ready||speaking||queue.isEmpty()||closed)return;String m=queue.poll();speaking=true;if(bell!=null)try{bell.startTone(ToneGenerator.TONE_PROP_BEEP,380);}catch(RuntimeException ignored){}
   handler.postDelayed(()->{if(closed||tts==null){speaking=false;return;}if(tts.speak(m,TextToSpeech.QUEUE_FLUSH,null,"xauusd-"+System.nanoTime())==TextToSpeech.ERROR){speaking=false;update("TTS menolak pesan; periksa mesin dan data suara.");playNext();}else recordHistory(m);},480L);
  }
- private void recordHistory(String message){SharedPreferences p=context.getSharedPreferences("voice_history",Context.MODE_PRIVATE);String old=p.getString("entries","");String line=java.text.DateFormat.getDateTimeInstance().format(new Date())+" | "+message;String[] rows=(old.isEmpty()?new String[0]:old.split("
-"));StringBuilder out=new StringBuilder();for(int i=Math.max(0,rows.length-49);i<rows.length;i++){if(out.length()>0)out.append("
-");out.append(rows[i]);}if(out.length()>0)out.append("
-");out.append(line);p.edit().putString("entries",out.toString()).apply();}\n private void update(String s){status=s;if(listener!=null)listener.onVoiceStatus(s);}
+ private void recordHistory(String message){
+  SharedPreferences prefs=context.getSharedPreferences("voice_history",Context.MODE_PRIVATE);
+  String old=prefs.getString("entries","");
+  String[] rows=old.isEmpty()?new String[0]:old.split("\\n");
+  StringBuilder out=new StringBuilder();
+  for(int i=Math.max(0,rows.length-49);i<rows.length;i++){if(out.length()>0)out.append('\n');out.append(rows[i]);}
+  if(out.length()>0)out.append('\n');
+  out.append(java.text.DateFormat.getDateTimeInstance().format(new Date())).append(" | ").append(message);
+  prefs.edit().putString("entries",out.toString()).apply();
+ }
+ private void update(String s){status=s;if(listener!=null)listener.onVoiceStatus(s);}
  public void shutdown(){closed=true;handler.removeCallbacksAndMessages(null);queue.clear();if(bell!=null)bell.release();if(tts!=null){tts.stop();tts.shutdown();tts=null;}}
 }
