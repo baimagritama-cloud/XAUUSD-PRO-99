@@ -14,12 +14,17 @@ public final class EconomicCalendarClient {
         Response(String body,String source,long receivedAtMs){this.body=body;this.source=source;this.receivedAtMs=receivedAtMs;}
     }
     private EconomicCalendarClient(){}
-    public static Response fetch(String endpoint) throws Exception {
+    public static Response fetch(String endpoint,String apiKey) throws Exception {
         if(endpoint==null||!endpoint.trim().toLowerCase(java.util.Locale.US).startsWith("https://"))
             throw new IllegalArgumentException("Calendar endpoint wajib HTTPS");
+        if(apiKey==null||apiKey.trim().isEmpty())
+            throw new IllegalArgumentException("API key kalender belum disimpan");
+        if(endpoint.matches("(?i).*([?&])c=.*"))
+            throw new IllegalArgumentException("Jangan masukkan API key ke URL; gunakan kolom API key terenkripsi");
         HttpURLConnection c=(HttpURLConnection)new URL(endpoint).openConnection();
         c.setRequestMethod("GET");c.setConnectTimeout(12000);c.setReadTimeout(15000);
         c.setRequestProperty("Accept","application/json");c.setRequestProperty("User-Agent","XAUUSD-PRO-99/1.0");
+        c.setRequestProperty("Authorization",apiKey.trim());
         try{
             int code=c.getResponseCode();
             InputStream in=code>=200&&code<300?c.getInputStream():c.getErrorStream();

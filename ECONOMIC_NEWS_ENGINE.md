@@ -2,11 +2,11 @@
 
 ## Data integrity and provider contract
 - Accepts only HTTPS JSON calendar endpoints configured by the user/provider. No embedded sample calendar, fabricated schedule, or hard-coded future event is used.
-- Recommended source: Trading Economics Calendar API. Its official documentation specifies CalendarId, Date (UTC), Country, Event, Source, Actual, Previous, Forecast, Importance and LastUpdate. API access requires a provider subscription/API key; the app does not embed a key. Example endpoint: https://api.tradingeconomics.com/calendar/country/united%20states?c=YOUR_API_KEY&f=json.
+- Recommended source: Trading Economics Calendar API. Its official documentation specifies CalendarId, Date (UTC), Country, Event, Source, Actual, Previous, Forecast, Importance and LastUpdate. API access requires a provider subscription/API key. The key is encrypted with Android Keystore and sent in the Authorization header; it is not embedded in the APK or URL. Example endpoint: https://api.tradingeconomics.com/calendar/country/united%20states?f=json.
 - Supports common TradingEconomics JSON keys: CalendarId, Country, Event, Date, Importance, Previous, Forecast, Actual, Source, LastUpdate. A root array or {"data":[...]} is accepted.
 - Only US/USA/United States events matching the USD/XAUUSD macro-event watchlist are retained. This includes FOMC/Fed rate/Powell, CPI/Core CPI, PCE/Core PCE, NFP, unemployment, average hourly earnings, GDP, ISM manufacturing/services, retail sales, initial jobless claims, PPI, durable goods, consumer confidence and JOLTS.
 - Previous/Forecast/Actual are preserved as provider text (including units such as %, K, M or B); missing values remain null and render as unavailable. The per-event Source field identifies the publisher such as BLS/BEA/ISM when supplied. Invalid/empty response is INVALID; no endpoint/failed request is DATA UNAVAILABLE; calendar older than 30 minutes is STALE.
-- Source is displayed as the exact configured HTTPS endpoint. This build does not claim that a provider endpoint is verified or preconfigured. The user must supply a licensed/authorized JSON calendar endpoint and credentials if required. No provider key is embedded in the APK.
+- Source is displayed as the exact configured HTTPS endpoint. This build does not claim that a provider endpoint is verified or preconfigured. The user must supply a licensed/authorized JSON calendar endpoint and credentials if required. No provider key is embedded in the APK. Credentials are entered by the user in the app and encrypted at rest.
 
 ## Alerts
 - 45-minute and 30-minute alerts are emitted in a ±30-second scheduler window, once per event/type.

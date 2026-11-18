@@ -20,6 +20,7 @@ import android.widget.TextView;
 import com.xauusdpro99.data.connection.BiquoteConnectionEngine;
 import com.xauusdpro99.data.news.EconomicNewsEngine;
 import com.xauusdpro99.data.news.EconomicCalendarClient;
+import com.xauusdpro99.data.news.CalendarCredentialStore;
 import android.os.Handler;
 import android.os.Looper;
 import com.xauusdpro99.data.alert.MarketAlertEngine;
@@ -477,17 +478,23 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         new AlertDialog.Builder(this).setTitle("Pilih item untuk tandai dibaca").setItems(labels,(d,w)->{notificationCenter.markRead(x.get(w).id);showNotificationHistory();}).setNeutralButton("TANDAI SEMUA DIBACA",(d,w)->{notificationCenter.markAllRead();Toast.makeText(this,"Riwayat ditandai dibaca",Toast.LENGTH_SHORT).show();}).setPositiveButton("TUTUP",null).show();}
 
     private void configureCalendarEndpoint() {
-        EditText input=new EditText(this);
-        input.setSingleLine(true);
-        input.setHint("https://.../calendar.json");
-        input.setText(calendarEndpoint);
-        new AlertDialog.Builder(this).setTitle("Sumber kalender ekonomi (HTTPS JSON)")
-            .setMessage("Trading Economics API (perlu API key/akses provider): https://api.tradingeconomics.com/calendar/country/united%20states?c=API_KEY&f=json. Tempel endpoint HTTPS lengkap. Field nilai disimpan sebagai teks asli agar satuan %, K, M, B tidak hilang. Jika belum ada akses/endpoint, dashboard tetap DATA UNAVAILABLE.")
-            .setView(input).setPositiveButton("SIMPAN",(d,w)->{
-                calendarEndpoint=input.getText().toString().trim();
+        LinearLayout form=new LinearLayout(this);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(24,8,24,8);
+        EditText endpoint=new EditText(this);endpoint.setSingleLine(true);
+        endpoint.setHint("https://api.tradingeconomics.com/calendar/country/united%20states?f=json");
+        endpoint.setText(calendarEndpoint);
+        EditText apiKey=new EditText(this);apiKey.setSingleLine(true);apiKey.setInputType(129);
+        apiKey.setHint(CalendarCredentialStore.load(this).isEmpty()?"API key Trading Economics":"API key tersimpan terenkripsi — isi hanya jika ingin mengganti");
+        form.addView(text("ENDPOINT HTTPS (tanpa parameter c=)",12,0xFFFFFFFF));form.addView(endpoint);
+        form.addView(text("API KEY — disimpan terenkripsi Android Keystore",12,0xFFFFFFFF));form.addView(apiKey);
+        new AlertDialog.Builder(this).setTitle("Sumber kalender ekonomi")
+            .setMessage("Sumber yang disarankan: Trading Economics Calendar API. Perlu langganan/API key provider. Jangan tempel key ke URL; aplikasi mengirimnya melalui header Authorization.")
+            .setView(form).setPositiveButton("SIMPAN",(d,w)->{
+                calendarEndpoint=endpoint.getText().toString().trim();
                 newsPrefs.edit().putString("calendar_endpoint",calendarEndpoint).apply();
-                if(calendarEndpoint.isEmpty()) economicNewsEngine.markUnavailable("endpoint belum dikonfigurasi",System.currentTimeMillis());
-                else fetchEconomicCalendar();
+                try {String key=apiKey.getText().toString().trim();if(!key.isEmpty())CalendarCredentialStore.save(this,key);
+                    if(calendarEndpoint.isEmpty())economicNewsEngine.markUnavailable("endpoint belum dikonfigurasi",System.currentTimeMillis());
+                    else fetchEconomicCalendar();
+                } catch(Exception ex){Toast.makeText(this,"Gagal menyimpan API key secara aman",Toast.LENGTH_LONG).show();}
                 renderEconomicNews(latestSnapshots);
             }).setNegativeButton("BATAL",null).show();
     }
@@ -502,7 +509,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         lastCalendarFetchAtMs=System.currentTimeMillis();
         newsExecutor.execute(()->{
             try {
-                EconomicCalendarClient.Response response=EconomicCalendarClient.fetch(endpoint);
+                EconomicCalendarClient.Response response=EconomicCalendarClient.fetch(endpoint,CalendarCredentialStore.load(this));
                 lastCalendarFetchAtMs=response.receivedAtMs;
                 boolean ok=economicNewsEngine.updateJson(response.body,response.source,response.receivedAtMs);
                 runOnUiThread(()->{
