@@ -8,7 +8,7 @@ import java.util.*;
 
 /** Detects market events exclusively from validated closed candles. */
 public final class MarketAlertEngine {
- public enum Type { EMA_BULLISH_CROSSOVER,EMA_BEARISH_CROSSOVER,BULLISH_ALIGNMENT,BEARISH_ALIGNMENT,EMA_RETEST_SUCCESS,EMA_RETEST_FAILED,EMA_CROSSOVER_FAILED,BREAK_SUPPORT,BREAK_RESISTANCE,BREAKOUT_SUPPLY,BREAKOUT_DEMAND,FALSE_BREAKOUT,BOS,CHOCH,BULLISH_REVERSAL_CONFIRMED,BEARISH_REVERSAL_CONFIRMED,BUY_CONFIRMED,SELL_CONFIRMED }
+ public enum Type { EMA_BULLISH_CROSSOVER,EMA_BEARISH_CROSSOVER,BULLISH_ALIGNMENT,BEARISH_ALIGNMENT,EMA_RETEST_SUCCESS,EMA_RETEST_FAILED,EMA_CROSSOVER_FAILED,BREAK_SUPPORT,BREAK_RESISTANCE,BREAKOUT_SUPPLY,BREAKOUT_DEMAND,FALSE_BREAKOUT,BOS,CHOCH,BULLISH_REVERSAL_CONFIRMED,BEARISH_REVERSAL_CONFIRMED,BUY_CONFIRMED,SELL_CONFIRMED,SUPPLY_TOUCHED,DEMAND_TOUCHED,RETEST,REJECTION,NEWS_ALERT }
  public static final long COOLDOWN_MS=300000L;
  public static final class Alert { public final Type type; public final String timeframe,status,reason,invalidation; public final double price; public final long timestampMs;
   Alert(Type t,String f,double p,long ts,String s,String r,String v){type=t;timeframe=f;price=p;timestampMs=ts;status=s;reason=r;invalidation=v;} }
@@ -21,7 +21,7 @@ public final class MarketAlertEngine {
    candles=c;indicators=i;structures=s;zones=z;patterns=p;signals=g;nowMs=n;
   }
  }
- private final Map<String,Long> processed=new HashMap<>(),emitted=new HashMap<>();
+ private final Map<String,Long> processed=new HashMap<>(),emitted=new HashMap<>();\n private long cooldownMs=COOLDOWN_MS;\n public synchronized void setCooldownMinutes(int minutes){cooldownMs=Math.max(0,Math.min(1440,minutes))*60000L;}
  private final Map<String,Cross> pending=new HashMap<>();
  private static final class Cross {final boolean bull;final long time;Cross(boolean b,long t){bull=b;time=t;}}
  public synchronized List<Alert> evaluate(Input in){
@@ -60,10 +60,18 @@ public final class MarketAlertEngine {
     if(e.type==MarketStructureEngine.EventType.FALSE_BREAKOUT_UP||e.type==MarketStructureEngine.EventType.FALSE_BREAKOUT_DOWN)emit(out,key,Type.FALSE_BREAKOUT,tfName,e.close,e.timestampMs,"CONFIRMED",e.detail,"Close valid di luar "+fmt(e.level),in.nowMs);
    }
    SupplyDemandEngine.Result sd=in.zones==null?null:in.zones.get(tf);
-   if(sd!=null)for(SupplyDemandEngine.Breakout e:sd.breakouts)if(e.timestampMs==c.closeTimeMs()){
-    Type t=e.type==SupplyDemandEngine.BreakoutType.VALID_UP?Type.BREAKOUT_SUPPLY:e.type==SupplyDemandEngine.BreakoutType.VALID_DOWN?Type.BREAKOUT_DEMAND:
-      (e.type==SupplyDemandEngine.BreakoutType.FALSE_UP||e.type==SupplyDemandEngine.BreakoutType.FALSE_DOWN)?Type.FALSE_BREAKOUT:null;
-    if(t!=null)emit(out,key,t,tfName,e.close,e.timestampMs,"CONFIRMED",e.note,"Close kembali ke dalam level "+fmt(e.level),in.nowMs);
+   if(sd!=null){
+    for(SupplyDemandEngine.Zone z:sd.activeZones())if(c.high>=z.lower&&c.low<=z.upper){
+     Type touch=z.type==SupplyDemandEngine.ZoneType.SUPPLY?Type.SUPPLY_TOUCHED:Type.DEMAND_TOUCHED;
+     emit(out,key,touch,tfName,c.close,c.closeTimeMs(),"INFO","Harga menyentuh "+z.type+" "+z.label+" ["+fmt(z.lower)+"-"+fmt(z.upper)+"]","Close keluar zona atau zona invalidated",in.nowMs);
+     boolean reject=z.type==SupplyDemandEngine.ZoneType.SUPPLY?upper(c)>=Math.max(body(c)*1.5,0.00001)&&c.close<z.upper:lower(c)>=Math.max(body(c)*1.5,0.00001)&&c.close>z.lower;
+     if(reject)emit(out,key,Type.REJECTION,tfName,c.close,c.closeTimeMs(),"CONFIRMED","Wick rejection pada "+z.type+" "+z.label,"Close menembus invalidasi zona",in.nowMs);
+    }
+    for(SupplyDemandEngine.Breakout e:sd.breakouts)if(e.timestampMs==c.closeTimeMs()){
+     Type t=e.type==SupplyDemandEngine.BreakoutType.VALID_UP?Type.BREAKOUT_SUPPLY:e.type==SupplyDemandEngine.BreakoutType.VALID_DOWN?Type.BREAKOUT_DEMAND:(e.type==SupplyDemandEngine.BreakoutType.FALSE_UP||e.type==SupplyDemandEngine.BreakoutType.FALSE_DOWN)?Type.FALSE_BREAKOUT:(e.type==SupplyDemandEngine.BreakoutType.RETEST_UP||e.type==SupplyDemandEngine.BreakoutType.RETEST_DOWN)?Type.RETEST:null;
+     if(t!=null)emit(out,key,t,tfName,e.close,e.timestampMs,"CONFIRMED",e.note,"Close kembali ke dalam level "+fmt(e.level),in.nowMs);
+     if(e.retest==SupplyDemandEngine.RetestStatus.RETESTED_REJECTED)emit(out,key,Type.REJECTION,tfName,e.close,e.timestampMs,"CONFIRMED",e.note,"Close melewati level retest",in.nowMs);
+    }
    }
    List<CandlePatternEngine.Pattern> ps=in.patterns==null?null:in.patterns.get(tf);
    if(ps!=null)for(CandlePatternEngine.Pattern p:ps)if(p.timestampMs==c.closeTimeMs()&&p.status==CandlePatternEngine.Status.ENTRY_CONFIRMED){
@@ -77,7 +85,7 @@ public final class MarketAlertEngine {
   }
   return Collections.unmodifiableList(out);
  }
- private void emit(List<Alert>o,String k,Type t,String tf,double p,long ts,String st,String r,String v,long now){String id=t+":"+tf;Long last=emitted.get(id);if(last!=null&&(now<last||now-last<COOLDOWN_MS))return;emitted.put(id,now);o.add(new Alert(t,tf,p,ts,st,r,v));}
+ private void emit(List<Alert>o,String k,Type t,String tf,double p,long ts,String st,String r,String v,long now){String id=t+":"+tf;Long last=emitted.get(id);if(last!=null&&(now<last||now-last<cooldownMs))return;emitted.put(id,now);o.add(new Alert(t,tf,p,ts,st,r,v));}
  private static double ema(List<Candle>b,int end,int n){if(end<n)return Double.NaN;double v=0;for(int i=0;i<n;i++)v+=b.get(i).close;v/=n;double a=2d/(n+1);for(int i=n;i<end;i++)v=a*b.get(i).close+(1-a)*v;return v;}
  private static double atr(List<Candle>b){double v=0;for(int i=b.size()-14;i<b.size();i++){Candle c=b.get(i),p=b.get(i-1);v+=Math.max(c.high-c.low,Math.max(Math.abs(c.high-p.close),Math.abs(c.low-p.close)));}return v/14;}
  private static double body(Candle c){return Math.abs(c.close-c.open);}private static double lower(Candle c){return Math.min(c.open,c.close)-c.low;}private static double upper(Candle c){return c.high-Math.max(c.open,c.close);}

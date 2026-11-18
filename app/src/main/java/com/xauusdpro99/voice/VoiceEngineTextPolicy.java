@@ -1,0 +1,3 @@
+package com.xauusdpro99.voice;
+/** JVM-testable wording guard for trade announcements. */
+public final class VoiceEngineTextPolicy{private VoiceEngineTextPolicy(){}public static String message(String type,String tf,String status){if(type==null)return "";String t=type.toUpperCase(java.util.Locale.ROOT);if((t.equals("BUY_CONFIRMED")||t.equals("SELL_CONFIRMED"))&&!"CONFIRMED".equalsIgnoreCase(status))return "";if(t.equals("BUY_CONFIRMED"))return "Sinyal BUY terkonfirmasi";if(t.equals("SELL_CONFIRMED"))return "Sinyal SELL terkonfirmasi";return "Informasi pemantauan "+t+" pada timeframe "+tf+", bukan perintah entry";}}

@@ -5,7 +5,7 @@ import org.junit.Test;
 public class MarketAlertEngineTest {
  @Test public void alertCatalogContainsEveryRequiredEvent(){
   Set<MarketAlertEngine.Type> all=EnumSet.allOf(MarketAlertEngine.Type.class);
-  assertEquals(18,all.size());
+  assertEquals(23,all.size());
   for(MarketAlertEngine.Type t:MarketAlertEngine.Type.values())assertNotNull(t.name());
  }
  @Test public void staleInputCannotProduceAlerts(){

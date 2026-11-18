@@ -1,0 +1,3 @@
+package com.xauusdpro99.voice;
+import static org.junit.Assert.*;import org.junit.Test;
+public class VoiceEngineContractTest{@Test public void blocksPrematureBuySell(){assertFalse(VoiceEngineTextPolicy.message("BUY_CONFIRMED","M5","WAIT").contains("BUY"));assertFalse(VoiceEngineTextPolicy.message("SELL_CONFIRMED","M5","ACTIVE").contains("SELL"));assertTrue(VoiceEngineTextPolicy.message("BUY_CONFIRMED","M5","CONFIRMED").contains("BUY"));assertTrue(VoiceEngineTextPolicy.message("EMA_BULLISH_CROSSOVER","M15","CONFIRMED").contains("bukan perintah entry"));}}
