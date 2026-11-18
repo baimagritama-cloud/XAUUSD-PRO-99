@@ -499,6 +499,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             renderEconomicNews(latestSnapshots);return;
         }
         economicNewsSummary.setText("MENGAMBIL KALENDER — menunggu respons sumber HTTPS…");
+        lastCalendarFetchAtMs=System.currentTimeMillis();
         newsExecutor.execute(()->{
             try {
                 EconomicCalendarClient.Response response=EconomicCalendarClient.fetch(endpoint);

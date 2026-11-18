@@ -36,6 +36,19 @@ public class EconomicNewsEngineTest {
         assertTrue(e.evaluateAlerts(release-45*60_000L).isEmpty());
         assertEquals(1,e.evaluateAlerts(release-30*60_000L).size());
     }
+    @Test public void releaseAndActualAvailableAlertsAreSeparateEvents(){
+        EconomicNewsEngine e=new EconomicNewsEngine();
+        String scheduled=json("2027-01-15T13:15:00","null");
+        assertTrue(e.updateJson(scheduled,"https://calendar.example/api",NOW));
+        long release=java.time.Instant.parse("2027-01-15T13:15:00Z").toEpochMilli();
+        List<EconomicNewsEngine.Alert> atRelease=e.evaluateAlerts(release);
+        assertEquals(1,atRelease.size());
+        assertEquals(EconomicNewsEngine.AlertKind.RELEASE,atRelease.get(0).kind);
+        assertTrue(e.updateJson(json("2027-01-15T13:15:00","2.6"),"https://calendar.example/api",release+10_000L));
+        List<EconomicNewsEngine.Alert> actual=e.evaluateAlerts(release+10_000L);
+        assertEquals(1,actual.size());
+        assertEquals(EconomicNewsEngine.AlertKind.ACTUAL_AVAILABLE,actual.get(0).kind);
+    }
     @Test public void staleCalendarStopsAlerts(){
         EconomicNewsEngine e=new EconomicNewsEngine();
         assertTrue(e.updateJson(json("2027-01-15T13:15:00","null"),"https://calendar.example/api",NOW));
