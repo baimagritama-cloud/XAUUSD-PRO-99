@@ -570,22 +570,13 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     private void showMonitoringLog(){
         SharedPreferences p=getSharedPreferences("monitoring_runtime",MODE_PRIVATE);
         String message="SERVICE: "+p.getString("service_status","UNKNOWN")
-            +"
-CONNECTION: "+p.getString("connection_status","UNKNOWN")
-            +"
-MONITOR: "+p.getString("monitoring_status","Belum ada update")
-            +"
-LAST TICK: "+DateFormat.getDateTimeInstance().format(new Date(p.getLong("last_tick_at",0)))
-            +"
-HEARTBEAT: "+DateFormat.getDateTimeInstance().format(new Date(p.getLong("service_heartbeat_at",0)))
-            +"
-WORKMANAGER: "+p.getString("workmanager_status","Belum berjalan")
-            +"
-BOOT: "+p.getString("boot_status","Belum ada event restart")
-            +"
-
-LOG RECONNECT:
-"+p.getString("reconnect_log","Belum ada log");
+            +"\\nCONNECTION: "+p.getString("connection_status","UNKNOWN")
+            +"\\nMONITOR: "+p.getString("monitoring_status","Belum ada update")
+            +"\\nLAST TICK: "+DateFormat.getDateTimeInstance().format(new Date(p.getLong("last_tick_at",0)))
+            +"\\nHEARTBEAT: "+DateFormat.getDateTimeInstance().format(new Date(p.getLong("service_heartbeat_at",0)))
+            +"\\nWORKMANAGER: "+p.getString("workmanager_status","Belum berjalan")
+            +"\\nBOOT: "+p.getString("boot_status","Belum ada event restart")
+            +"\\n\\nLOG RECONNECT:\\n"+p.getString("reconnect_log","Belum ada log");
         new AlertDialog.Builder(this).setTitle("Background Monitoring Status").setMessage(message)
             .setPositiveButton("TUTUP",null).show();
     }
@@ -611,7 +602,8 @@ LOG RECONNECT:
         Button cooldown=new Button(this);cooldown.setText("COOLDOWN: "+cooldownMinutes+" MENIT");cooldown.setOnClickListener(v->showCooldownDialog(cooldown));root.addView(cooldown,matchWrap());
         Button quiet=new Button(this);quiet.setText("QUIET HOURS: "+(quietEnabled?"AKTIF":"NONAKTIF"));quiet.setOnClickListener(v->{quietEnabled=!quietEnabled;saveNotificationSettings();quiet.setText("QUIET HOURS: "+(quietEnabled?"AKTIF":"NONAKTIF"));});root.addView(quiet,matchWrap());
         Button quietTime=new Button(this);quietTime.setText("ATUR JAM TENANG (DEFAULT 22:00–07:00)");quietTime.setOnClickListener(v->showQuietHoursDialog());root.addView(quietTime,matchWrap());
-        Button history=new Button(this);history.setText("RIWAYAT NOTIFIKASI");history.setOnClickListener(v->showNotificationHistory());root.addView(history,matchWrap());\n        Button voiceHistory=new Button(this);voiceHistory.setText("RIWAYAT SUARA");voiceHistory.setOnClickListener(v->showVoiceHistory());root.addView(voiceHistory,matchWrap());
+        Button history=new Button(this);history.setText("RIWAYAT NOTIFIKASI");history.setOnClickListener(v->showNotificationHistory());root.addView(history,matchWrap());
+        Button voiceHistory=new Button(this);voiceHistory.setText("RIWAYAT SUARA");voiceHistory.setOnClickListener(v->showVoiceHistory());root.addView(voiceHistory,matchWrap());
     }
     private void requestNotificationPermission(){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},1101);}
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){super.onRequestPermissionsResult(code,permissions,results);if(code==1101){boolean ok=results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED;Toast.makeText(this,ok?"Izin notifikasi diberikan":"Izin ditolak; riwayat tetap tersimpan di aplikasi",Toast.LENGTH_LONG).show();}}
@@ -620,7 +612,13 @@ LOG RECONNECT:
         new AlertDialog.Builder(this).setTitle("Jenis alert aktif").setMultiChoiceItems(names,checked,(d,w,on)->{if(on)enabledAlertTypes.add(names[w]);else enabledAlertTypes.remove(names[w]);}).setPositiveButton("SIMPAN",(d,w)->saveNotificationSettings()).setNegativeButton("BATAL",null).show();}
     private void showCooldownDialog(Button b){EditText input=new EditText(this);input.setInputType(2);input.setText(Integer.toString(cooldownMinutes));new AlertDialog.Builder(this).setTitle("Cooldown (menit, 0–1440)").setView(input).setPositiveButton("SIMPAN",(d,w)->{try{cooldownMinutes=Math.max(0,Math.min(1440,Integer.parseInt(input.getText().toString())));saveNotificationSettings();b.setText("COOLDOWN: "+cooldownMinutes+" MENIT");}catch(NumberFormatException e){Toast.makeText(this,"Cooldown tidak valid",Toast.LENGTH_SHORT).show();}}).setNegativeButton("BATAL",null).show();}
     private void showQuietHoursDialog(){new TimePickerDialog(this,(v,h,m)->{quietStartMinute=h*60+m;new TimePickerDialog(this,(v2,h2,m2)->{quietEndMinute=h2*60+m2;saveNotificationSettings();Toast.makeText(this,"Quiet hours tersimpan",Toast.LENGTH_SHORT).show();},quietEndMinute/60,quietEndMinute%60,true).show();},quietStartMinute/60,quietStartMinute%60,true).show();}
-    private void showVoiceHistory(){String history=getSharedPreferences("voice_history",MODE_PRIVATE).getString("entries","");if(history.trim().isEmpty())history="Belum ada pesan suara yang berhasil dikirim ke mesin TTS.";new AlertDialog.Builder(this).setTitle("Riwayat Suara (50 terakhir)").setMessage(history).setPositiveButton("TUTUP",null).show();}\n    private void showNotificationHistory(){List<NotificationCenter.Item>x=notificationCenter.recent(50);if(x.isEmpty()){new AlertDialog.Builder(this).setMessage("Belum ada riwayat notifikasi.").setPositiveButton("OK",null).show();return;}String[] labels=new String[x.size()];for(int i=0;i<x.size();i++){NotificationCenter.Item a=x.get(i);labels[i]=(a.read?"DIBACA":"BARU")+" | "+DateFormat.getDateTimeInstance().format(new Date(a.timestampMs))+"\n"+a.title+" — "+a.message;}
+    private void showVoiceHistory(){
+        String history=getSharedPreferences("voice_history",MODE_PRIVATE).getString("entries","");
+        if(history.trim().isEmpty())history="Belum ada pesan suara yang berhasil dikirim ke mesin TTS.";
+        new AlertDialog.Builder(this).setTitle("Riwayat Suara (50 terakhir)").setMessage(history).setPositiveButton("TUTUP",null).show();
+    }
+
+    private void showNotificationHistory(){List<NotificationCenter.Item>x=notificationCenter.recent(50);if(x.isEmpty()){new AlertDialog.Builder(this).setMessage("Belum ada riwayat notifikasi.").setPositiveButton("OK",null).show();return;}String[] labels=new String[x.size()];for(int i=0;i<x.size();i++){NotificationCenter.Item a=x.get(i);labels[i]=(a.read?"DIBACA":"BARU")+" | "+DateFormat.getDateTimeInstance().format(new Date(a.timestampMs))+"\n"+a.title+" — "+a.message;}
         new AlertDialog.Builder(this).setTitle("Pilih item untuk tandai dibaca").setItems(labels,(d,w)->{notificationCenter.markRead(x.get(w).id);showNotificationHistory();}).setNeutralButton("TANDAI SEMUA DIBACA",(d,w)->{notificationCenter.markAllRead();Toast.makeText(this,"Riwayat ditandai dibaca",Toast.LENGTH_SHORT).show();}).setPositiveButton("TUTUP",null).show();}
 
     private void configureCalendarEndpoint() {
