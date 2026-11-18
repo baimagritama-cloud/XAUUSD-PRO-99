@@ -540,8 +540,9 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                 .append(e.name).append(" | ").append(e.country).append(" | ").append(e.impact).append("\n")
                 .append("Rilis: ").append(DateFormat.getDateTimeInstance().format(new Date(e.releaseAtMs)))
                 .append(" | ").append(countdown).append(" | ").append(e.status).append("\n")
-                .append("Previous: ").append(fmt(e.previous)).append(" | Forecast: ").append(fmt(e.forecast))
-                .append(" | Actual: ").append(fmt(e.actual)).append("\n");
+                .append("Previous: ").append(newsValue(e.previous)).append(" | Forecast: ").append(newsValue(e.forecast))
+                .append(" | Actual: ").append(newsValue(e.actual)).append("\n")
+                .append("Sumber rilis: ").append(e.source).append("\n");
             EconomicNewsEngine.Reaction reaction=economicNewsEngine.analyzeReaction(e,m1);
             out.append("REAKSI XAUUSD: ").append(reaction.status).append(" | arah awal=").append(reaction.initialDirection)
                 .append(" | perubahan=").append(fmt(reaction.change)).append(" | rentang candle=").append(fmt(reaction.reactionRange))
