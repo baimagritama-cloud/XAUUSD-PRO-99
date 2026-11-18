@@ -7,7 +7,7 @@ import java.util.List;
 public class EconomicNewsEngineTest {
     private static final long NOW=1_800_000_000_000L;
     private static String json(String eventDate,String actual) {
-        return "[{\"Country\":\"United States\",\"Event\":\"CPI y/y\",\"Date\":\""+eventDate+"\",\"Importance\":\"3\",\"Previous\":\"2.4%\",\"Forecast\":\"2.5%\",\"Actual\":"+actual+"},"
+        return "[{\"Country\":\"United States\",\"Event\":\"CPI y/y\",\"Date\":\""+eventDate+"\",\"Importance\":\"3\",\"Previous\":\"2.4%\",\"Forecast\":\"7.079M\",\"Source\":\"U.S. Bureau of Labor Statistics\",\"Actual\":"+actual+"},"
             +"{\"Country\":\"United States\",\"Event\":\"Unrelated event\",\"Date\":\""+eventDate+"\"},"
             +"{\"Country\":\"Canada\",\"Event\":\"CPI y/y\",\"Date\":\""+eventDate+"\"}]";
     }
@@ -17,7 +17,7 @@ public class EconomicNewsEngineTest {
         assertEquals(1,e.getEvents().size());
         EconomicNewsEngine.Event x=e.getEvents().get(0);
         assertEquals("CPI y/y",x.name);assertEquals("2.4%",x.previous);
-        assertEquals("2.5%",x.forecast);assertNull(x.actual);
+        assertEquals("7.079M",x.forecast);assertEquals("U.S. Bureau of Labor Statistics",x.source);assertNull(x.actual);
     }
     @Test public void rejectsNonHttpsAndMalformedCalendar(){
         EconomicNewsEngine e=new EconomicNewsEngine();

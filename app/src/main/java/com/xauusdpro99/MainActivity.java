@@ -565,9 +565,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     }
 
     private void deliverEconomicAlert(String headline,String summary,long eventTime,String dedupeKey) {
-        boolean fresh=latestTick!=null&&connectionStatus==BiquoteConnectionEngine.Status.LIVE
-            &&latestQuoteReceivedAtMs>0&&System.currentTimeMillis()-latestQuoteReceivedAtMs<=15000L
-            &&!Boolean.TRUE.equals(latestTick.stale)&&(latestTick.quoteAgeSeconds==null||latestTick.quoteAgeSeconds<=300);
+        boolean fresh=economicNewsEngine.getDataStatus()==EconomicNewsEngine.DataStatus.LIVE;
         if(!notificationPolicy.accept("NEWS_ALERT","NEWS:"+dedupeKey,System.currentTimeMillis(),fresh,
                 enabledAlertTypes.contains("NEWS_ALERT"),cooldownMinutes))return;
         String title="XAUUSD — ECONOMIC NEWS — "+headline;
