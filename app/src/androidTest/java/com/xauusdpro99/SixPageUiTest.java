@@ -4,12 +4,16 @@ import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 
+import androidx.test.core.app.ActivityScenario;
+import androidx.test.rule.GrantPermissionRule;
+
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -17,6 +21,10 @@ import java.io.File;
 
 @RunWith(AndroidJUnit4.class)
 public final class SixPageUiTest {
+    @Rule
+    public final GrantPermissionRule notificationPermission =
+        GrantPermissionRule.grant(android.Manifest.permission.POST_NOTIFICATIONS);
+
     private static final String[] PAGES = {
         "LIVE CHART", "MARKET JOURNEY", "INDICATOR CENTER",
         "SIGNAL CENTER", "NEWS", "NOTIFICATIONS"
@@ -24,6 +32,7 @@ public final class SixPageUiTest {
 
     @Test
     public void navigateAllPagesAndCapturePortraitLandscapeScreenshots() throws Exception {
+        try (ActivityScenario<MainActivity> ignored = ActivityScenario.launch(MainActivity.class)) {
         UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         File output = new File(context.getExternalFilesDir(null), "ui-screenshots");
@@ -62,6 +71,7 @@ public final class SixPageUiTest {
             File screenshot = new File(output, name);
             assertTrue("Missing or empty screenshot: " + screenshot, screenshot.isFile() && screenshot.length() > 0);
         }
+        }
     }
 
     private static void captureAllPages(UiDevice device, File output, String orientation) throws Exception {
@@ -82,6 +92,20 @@ public final class SixPageUiTest {
             if (nav == null) throw new AssertionError("Navigation tab not found: " + page);
             nav.click();
             device.waitForIdle();
+            String anchor = page.equals("MARKET JOURNEY") ? "MARKET JOURNEY"
+                : page.equals("INDICATOR CENTER") ? "INDICATORS (closed candles only)"
+                : page.equals("SIGNAL CENTER") ? "SIGNAL CENTER"
+                : page.equals("NEWS") ? "ECONOMIC CALENDAR"
+                : page.equals("NOTIFICATIONS") ? "VOICE ENGINE & NOTIFICATION CENTER"
+                : "XAUUSD PRO 99";
+            if (device.findObject(By.textContains(anchor)) == null) {
+                throw new AssertionError("Page content not visible after navigation: " + page);
+            }
+            if (page.equals("NEWS")) {
+                click(device, "REFRESH ECONOMIC CALENDAR");
+            } else if (page.equals("NOTIFICATIONS")) {
+                click(device, "SUARA: AKTIF");
+            }
             Thread.sleep(350);
             File screenshot = new File(output,
                 orientation + "_" + page.toLowerCase().replace(' ', '_') + ".png");
