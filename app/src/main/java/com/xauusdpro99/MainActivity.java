@@ -40,6 +40,8 @@ import com.xauusdpro99.data.signal.MarketJourneyEngine;
 import com.xauusdpro99.voice.VoiceEngine;
 import com.xauusdpro99.notification.NotificationCenter;
 import com.xauusdpro99.notification.NotificationPolicy;
+import com.xauusdpro99.monitoring.MarketMonitoringService;
+import com.xauusdpro99.monitoring.MonitoringWorkScheduler;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -65,7 +67,10 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     private NotificationCenter notificationCenter;
     private final NotificationPolicy notificationPolicy = new NotificationPolicy();
     private SharedPreferences notificationPrefs;
-    private TextView voiceStatus, economicNewsSummary;
+    private TextView voiceStatus, economicNewsSummary, monitoringStatus;
+    private Button monitoringButton;
+    private SharedPreferences monitoringPrefs;
+    private boolean backgroundMonitoring;
     private final EconomicNewsEngine economicNewsEngine = new EconomicNewsEngine();
     private SharedPreferences newsPrefs;
     private final Handler newsHandler = new Handler(Looper.getMainLooper());
@@ -89,8 +94,13 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        engine = new BiquoteConnectionEngine(this);
-        candleEngine = new MultiTimeframeEngine(this);
+        monitoringPrefs=getSharedPreferences("monitoring_settings",MODE_PRIVATE);
+        backgroundMonitoring=monitoringPrefs.getBoolean("background_monitor_enabled",false);
+        if(!backgroundMonitoring){
+            engine = new BiquoteConnectionEngine(this);
+            candleEngine = new MultiTimeframeEngine(this);
+        }
+        MonitoringWorkScheduler.schedule(this);
         notificationCenter = new NotificationCenter(this);
         notificationPrefs = getSharedPreferences("notification_settings", MODE_PRIVATE);
         newsPrefs = getSharedPreferences("economic_news_settings", MODE_PRIVATE);
@@ -111,10 +121,10 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         source = text("Sumber: BiQuote", 13, 0xFFCCCCCC);
         Button refresh = new Button(this);
         refresh.setText("REFRESH TICK");
-        refresh.setOnClickListener(v -> engine.refresh());
+        refresh.setOnClickListener(v -> {if(engine!=null)engine.refresh();else Toast.makeText(this,"Tick dipantau oleh Foreground Service",Toast.LENGTH_SHORT).show();});
         Button refreshCandles = new Button(this);
         refreshCandles.setText("REFRESH 12 TIMEFRAME");
-        refreshCandles.setOnClickListener(v -> candleEngine.refreshAll());
+        refreshCandles.setOnClickListener(v -> {if(candleEngine!=null)candleEngine.refreshAll();else Toast.makeText(this,"Candle dipantau oleh Foreground Service",Toast.LENGTH_SHORT).show();});
         candleSummary = text("CANDLE ENGINE: belum mengambil data.", 12, 0xFFE0E0E0);
         indicatorSummary = text("INDICATOR ENGINE: menunggu OHLC tertutup yang valid.", 12, 0xFFE0E0E0);
         patternSummary = text("CANDLE PATTERN ENGINE: menunggu candle tertutup yang valid.", 12, 0xFFE0E0E0);
@@ -135,6 +145,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         root.addView(refresh, matchWrap());
         root.addView(refreshCandles, matchWrap());
         addNotificationControls(root);
+        addMonitoringControls(root);
         root.addView(text("ECONOMIC NEWS ENGINE",16,0xFFFFFFFF),matchWrap());
         Button configureCalendar=new Button(this);
         configureCalendar.setText("ATUR SUMBER KALENDER EKONOMI (HTTPS JSON)");
@@ -176,7 +187,14 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         root.addView(logScroll, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
         requestNotificationPermission();
-        engine.connect();
+        if(backgroundMonitoring){
+            MarketMonitoringService.start(this);
+            monitoringStatus.setText("FOREGROUND SERVICE: DIMINTA — status aktual tersedia pada notifikasi persisten");
+            monitoringButton.setText("BACKGROUND MONITORING: AKTIF");
+        }else{
+            engine.connect();
+            monitoringStatus.setText("BACKGROUND MONITORING: NONAKTIF — koneksi hanya selama layar aplikasi aktif");
+        }
         newsHandler.post(newsTicker);
         if(!calendarEndpoint.trim().isEmpty()) fetchEconomicCalendar();
     }
@@ -443,6 +461,51 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
 
     private String fmt(Double value) { return value == null ? "NOT ENOUGH DATA" : String.format(java.util.Locale.US, "%.2f", value); }
 
+
+    private void addMonitoringControls(LinearLayout root){
+        root.addView(text("BACKGROUND MONITORING SERVICE",16,0xFFFFFFFF),matchWrap());
+        monitoringStatus=text("Memeriksa status service…",13,0xFFFFD54F);
+        root.addView(monitoringStatus,matchWrap());
+        monitoringButton=new Button(this);
+        monitoringButton.setText("BACKGROUND MONITORING: "+(backgroundMonitoring?"AKTIF":"NONAKTIF"));
+        monitoringButton.setOnClickListener(v->toggleBackgroundMonitoring());
+        root.addView(monitoringButton,matchWrap());
+        Button logButton=new Button(this);logButton.setText("STATUS & LOG RECONNECT BACKGROUND");
+        logButton.setOnClickListener(v->showMonitoringLog());root.addView(logButton,matchWrap());
+        root.addView(text("Catatan: Force Stop menghentikan service. Restart perangkat tidak otomatis menyalakan live service; buka aplikasi untuk memulai lagi.",11,0xFFFFCC80),matchWrap());
+    }
+    private void toggleBackgroundMonitoring(){
+        if(!backgroundMonitoring){
+            monitoringPrefs.edit().putBoolean("background_monitor_enabled",true).apply();
+            if(engine!=null){engine.disconnect();engine=null;}
+            if(candleEngine!=null){candleEngine.close();candleEngine=null;}
+            backgroundMonitoring=true;
+            MarketMonitoringService.start(this);
+            monitoringStatus.setText("FOREGROUND SERVICE: START REQUESTED — periksa notifikasi persisten");
+            monitoringButton.setText("BACKGROUND MONITORING: AKTIF");
+        }else{
+            MarketMonitoringService.stop(this);
+            monitoringPrefs.edit().putBoolean("background_monitor_enabled",false).apply();
+            backgroundMonitoring=false;
+            engine=new BiquoteConnectionEngine(this);
+            candleEngine=new MultiTimeframeEngine(this);
+            engine.connect();
+            monitoringStatus.setText("BACKGROUND MONITORING: NONAKTIF — koneksi aplikasi aktif");
+            monitoringButton.setText("BACKGROUND MONITORING: NONAKTIF");
+        }
+    }
+    private void showMonitoringLog(){
+        SharedPreferences p=getSharedPreferences("monitoring_runtime",MODE_PRIVATE);
+        String message="SERVICE: "+p.getString("service_status","UNKNOWN")
+            +"\\nCONNECTION: "+p.getString("connection_status","UNKNOWN")
+            +"\\nMONITOR: "+p.getString("monitoring_status","Belum ada update")
+            +"\\nLAST TICK: "+DateFormat.getDateTimeInstance().format(new Date(p.getLong("last_tick_at",0)))
+            +"\\nWORKMANAGER: "+p.getString("workmanager_status","Belum berjalan")
+            +"\\nBOOT: "+p.getString("boot_status","Belum ada event restart")
+            +"\\n\\nLOG RECONNECT:\\n"+p.getString("reconnect_log","Belum ada log");
+        new AlertDialog.Builder(this).setTitle("Background Monitoring Status").setMessage(message)
+            .setPositiveButton("TUTUP",null).show();
+    }
 
     private void loadNotificationSettings(){
         notificationsEnabled=notificationPrefs.getBoolean("notifications_enabled",true);voiceEnabled=notificationPrefs.getBoolean("voice_enabled",true);quietEnabled=notificationPrefs.getBoolean("quiet_enabled",false);

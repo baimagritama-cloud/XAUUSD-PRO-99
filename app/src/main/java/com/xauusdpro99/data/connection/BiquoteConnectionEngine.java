@@ -199,6 +199,20 @@ public final class BiquoteConnectionEngine {
 
     private String safe(String value) { return value == null ? "sumber tidak diberikan" : value; }
 
+    /** Called by ConnectivityManager after network restoration. */
+    public void reconnectNow(String reason) {
+        if(closed.get()||!connecting.compareAndSet(false,true))return;
+        io.execute(()->{
+            HubConnection current=hub;
+            started.set(false);
+            if(current!=null)try{current.stop().blockingAwait();}catch(Throwable ignored){}
+            hub=null;
+            connecting.set(false);
+            log("Reconnect paksa: "+reason);
+            connect();
+        });
+    }
+
     public Status getStatus() { return status; }
 
     public void disconnect() {
