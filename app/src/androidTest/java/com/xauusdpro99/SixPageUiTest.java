@@ -104,7 +104,7 @@ public final class SixPageUiTest {
             if (page.equals("NEWS")) {
                 click(device, "REFRESH ECONOMIC CALENDAR");
             } else if (page.equals("NOTIFICATIONS")) {
-                click(device, "SUARA: AKTIF");
+                clickOneOf(device, "SUARA: AKTIF", "SUARA: NONAKTIF");
             }
             Thread.sleep(350);
             File screenshot = new File(output,
@@ -117,6 +117,14 @@ public final class SixPageUiTest {
     private static void click(UiDevice device, String text) {
         UiObject2 control = device.findObject(By.text(text));
         if (control == null) throw new AssertionError("Expected clickable control not found: " + text);
+        control.click();
+        device.waitForIdle();
+    }
+
+    private static void clickOneOf(UiDevice device, String first, String second) {
+        UiObject2 control = device.findObject(By.text(first));
+        if (control == null) control = device.findObject(By.text(second));
+        if (control == null) throw new AssertionError("Neither toggle state was found: " + first + " / " + second);
         control.click();
         device.waitForIdle();
     }
