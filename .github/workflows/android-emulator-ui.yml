@@ -12,7 +12,7 @@ jobs:
   emulator-ui:
     name: Six-page portrait and landscape UI test
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,24 +28,35 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Run Android Emulator instrumentation tests
+      - name: Run tests and collect screenshots while emulator is alive
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 30
           target: google_apis
-          arch: x86_64
+          arch: x86
           profile: pixel_2
-          emulator-options: -no-window -no-audio -no-boot-anim
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-audio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
-          script: gradle --no-daemon :app:connectedDebugAndroidTest
-
-      - name: Collect emulator screenshots
-        if: always()
-        run: |
-          mkdir -p artifacts/ui-screenshots
-          adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots || true
-          echo "Captured screenshots:"
-          find artifacts/ui-screenshots -maxdepth 1 -type f -name '*.png' -printf '%f (%s bytes)\\n' | sort
+          disable-linux-hw-accel: true
+          emulator-boot-timeout: 900
+          script: |
+            set +e
+            adb wait-for-device
+            adb shell getprop sys.boot_completed
+            gradle --no-daemon :app:connectedDebugAndroidTest
+            TEST_EXIT=$?
+            mkdir -p artifacts/ui-screenshots
+            adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots
+            PULL_EXIT=$?
+            echo "Captured screenshots:"
+            find artifacts/ui-screenshots -maxdepth 1 -type f -name '*.png' -printf '%f (%s bytes)\\n' | sort
+            if [ "$TEST_EXIT" -ne 0 ]; then exit "$TEST_EXIT"; fi
+            if [ "$PULL_EXIT" -ne 0 ]; then exit "$PULL_EXIT"; fi
+            COUNT=$(find artifacts/ui-screenshots -maxdepth 1 -type f -name '*.png' | wc -l)
+            if [ "$COUNT" -ne 12 ]; then
+              echo "Expected 12 screenshots, found $COUNT"
+              exit 1
+            fi
 
       - name: Upload UI screenshots and instrumentation reports
         if: always()
