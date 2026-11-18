@@ -570,13 +570,22 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     private void showMonitoringLog(){
         SharedPreferences p=getSharedPreferences("monitoring_runtime",MODE_PRIVATE);
         String message="SERVICE: "+p.getString("service_status","UNKNOWN")
-            +"\\nCONNECTION: "+p.getString("connection_status","UNKNOWN")
-            +"\\nMONITOR: "+p.getString("monitoring_status","Belum ada update")
-            +"\\nLAST TICK: "+DateFormat.getDateTimeInstance().format(new Date(p.getLong("last_tick_at",0)))
-            +"\\nHEARTBEAT: "+DateFormat.getDateTimeInstance().format(new Date(p.getLong("service_heartbeat_at",0)))
-            +"\\nWORKMANAGER: "+p.getString("workmanager_status","Belum berjalan")
-            +"\\nBOOT: "+p.getString("boot_status","Belum ada event restart")
-            +"\\n\\nLOG RECONNECT:\\n"+p.getString("reconnect_log","Belum ada log");
+            +"
+CONNECTION: "+p.getString("connection_status","UNKNOWN")
+            +"
+MONITOR: "+p.getString("monitoring_status","Belum ada update")
+            +"
+LAST TICK: "+DateFormat.getDateTimeInstance().format(new Date(p.getLong("last_tick_at",0)))
+            +"
+HEARTBEAT: "+DateFormat.getDateTimeInstance().format(new Date(p.getLong("service_heartbeat_at",0)))
+            +"
+WORKMANAGER: "+p.getString("workmanager_status","Belum berjalan")
+            +"
+BOOT: "+p.getString("boot_status","Belum ada event restart")
+            +"
+
+LOG RECONNECT:
+"+p.getString("reconnect_log","Belum ada log");
         new AlertDialog.Builder(this).setTitle("Background Monitoring Status").setMessage(message)
             .setPositiveButton("TUTUP",null).show();
     }
