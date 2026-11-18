@@ -56,6 +56,12 @@ import java.util.Map;
 
 public final class MainActivity extends Activity implements BiquoteConnectionEngine.Listener, MultiTimeframeEngine.Listener {
     private TextView price, bidAsk, timestamp, status, source, log, candleSummary, indicatorSummary, patternSummary, structureSummary, supplySummary, signalSummary, entryRiskSummary, marketJourneySummary, alertSummary;
+    private LinearLayout pageHost;
+    private final java.util.List<View> appPages=new java.util.ArrayList<>();
+    private LiveCandleChartView chartView;
+    private CandleTimeframe selectedTimeframe=CandleTimeframe.M1;
+    private String selectedEma="OFF",selectedChartIndicator="RSI14";
+    private TextView chartIndicatorLabel;
     private volatile BiquoteConnectionEngine.Status connectionStatus = BiquoteConnectionEngine.Status.DISCONNECTED;
     private volatile BiquoteTick latestTick;
     private volatile long latestQuoteReceivedAtMs;
@@ -127,82 +133,69 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         voiceEngine = new VoiceEngine(this, message -> runOnUiThread(() -> { if (voiceStatus != null) voiceStatus.setText("VOICE: " + message); }));
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(24, 24, 24, 24);
-        root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setBackgroundColor(0xFF101820);
+        root.setPadding(10, 8, 10, 6);
+        root.setBackgroundColor(0xFF0B1220);
+        TextView title=text("XAUUSD PRO 99  •  BIQUOTE",16,0xFFEAF2FF);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(title,matchWrap());
 
-        TextView title = text("XAUUSD PRO 99 — BIQUOTE", 18, 0xFFFFFFFF);
-        price = text("--", 36, 0xFFFFFFFF);
-        bidAsk = text("Bid: --    Ask: --    Spread: --", 16, 0xFFE0E0E0);
-        timestamp = text("Timestamp: menunggu data", 13, 0xFFCCCCCC);
-        status = text("DISCONNECTED", 16, 0xFFFFC107);
-        source = text("Sumber: BiQuote", 13, 0xFFCCCCCC);
-        Button refresh = new Button(this);
-        refresh.setText("REFRESH TICK");
-        refresh.setOnClickListener(v -> {if(engine!=null)engine.refresh();else Toast.makeText(this,"Tick dipantau oleh Foreground Service",Toast.LENGTH_SHORT).show();});
-        Button refreshCandles = new Button(this);
-        refreshCandles.setText("REFRESH 12 TIMEFRAME");
-        refreshCandles.setOnClickListener(v -> {if(candleEngine!=null)candleEngine.refreshAll();else Toast.makeText(this,"Candle dipantau oleh Foreground Service",Toast.LENGTH_SHORT).show();});
-        candleSummary = text("CANDLE ENGINE: belum mengambil data.", 12, 0xFFE0E0E0);
-        indicatorSummary = text("INDICATOR ENGINE: menunggu OHLC tertutup yang valid.", 12, 0xFFE0E0E0);
-        patternSummary = text("CANDLE PATTERN ENGINE: menunggu candle tertutup yang valid.", 12, 0xFFE0E0E0);
-        structureSummary = text("MARKET STRUCTURE: menunggu data.", 12, 0xFFE0E0E0);
-        supplySummary = text("SUPPLY / DEMAND: menunggu data.", 12, 0xFFE0E0E0);
-        signalSummary = text("MULTI-TIMEFRAME SIGNAL SCORING: menunggu data valid dari 12 timeframe.", 13, 0xFFFFFFFF);
-        entryRiskSummary = text("ENTRY / RISK PLAN: menunggu data tervalidasi.", 13, 0xFFFFFFFF);
-        marketJourneySummary = text("MARKET JOURNEY: menunggu quote dan level aktual.", 13, 0xFFFFFFFF);
-        alertSummary = text("MARKET ALERT: menunggu candle tertutup valid.", 13, 0xFFFFFFFF);
-        log = text("Log koneksi dan candle…", 12, 0xFFB0BEC5);
+        LinearLayout nav=new LinearLayout(this);nav.setOrientation(LinearLayout.HORIZONTAL);
+        android.widget.HorizontalScrollView navScroll=new android.widget.HorizontalScrollView(this);
+        navScroll.setHorizontalScrollBarEnabled(false);
+        String[] pageNames={"LIVE CHART","MARKET JOURNEY","INDICATOR CENTER","SIGNAL CENTER","NEWS","NOTIFICATIONS"};
+        for(int i=0;i<pageNames.length;i++){final int page=i;Button n=new Button(this);n.setText(pageNames[i]);n.setTextSize(10);n.setMinWidth(0);n.setPadding(10,4,10,4);n.setOnClickListener(v->showPage(page));nav.addView(n,new LinearLayout.LayoutParams(-2,44));}
+        navScroll.addView(nav);root.addView(navScroll,matchWrap());
 
-        root.addView(title, matchWrap());
-        root.addView(price, matchWrap());
-        root.addView(bidAsk, matchWrap());
-        root.addView(timestamp, matchWrap());
-        root.addView(status, matchWrap());
-        root.addView(source, matchWrap());
-        root.addView(refresh, matchWrap());
-        root.addView(refreshCandles, matchWrap());
-        addNotificationControls(root);
-        addMonitoringControls(root);
-        root.addView(text("ECONOMIC NEWS ENGINE",16,0xFFFFFFFF),matchWrap());
-        Button configureCalendar=new Button(this);
-        configureCalendar.setText("ATUR SUMBER KALENDER EKONOMI (HTTPS JSON)");
-        configureCalendar.setOnClickListener(v->configureCalendarEndpoint());
-        root.addView(configureCalendar,matchWrap());
-        Button refreshCalendar=new Button(this);
-        refreshCalendar.setText("REFRESH ECONOMIC CALENDAR");
-        refreshCalendar.setOnClickListener(v->fetchEconomicCalendar());
-        root.addView(refreshCalendar,matchWrap());
-        economicNewsSummary=text("DATA UNAVAILABLE — sumber kalender belum dikonfigurasi. Tidak ada jadwal/angka buatan.",13,0xFFE0E0E0);
-        ScrollView newsScroll=new ScrollView(this);newsScroll.addView(economicNewsSummary);
-        root.addView(newsScroll,new LinearLayout.LayoutParams(-1,0,3));
-        ScrollView candleScroll = new ScrollView(this);
-        candleScroll.addView(candleSummary);
-        root.addView(candleScroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        ScrollView indicatorScroll = new ScrollView(this);
-        indicatorScroll.addView(indicatorSummary);
-        root.addView(indicatorScroll, new LinearLayout.LayoutParams(-1, 0, 2));
-        ScrollView patternScroll = new ScrollView(this);
-        patternScroll.addView(patternSummary);
-        root.addView(patternScroll, new LinearLayout.LayoutParams(-1, 0, 2));
-        ScrollView structureScroll = new ScrollView(this);
-        structureScroll.addView(structureSummary);
-        root.addView(structureScroll, new LinearLayout.LayoutParams(-1, 0, 2));
-        ScrollView supplyScroll = new ScrollView(this);
-        supplyScroll.addView(supplySummary);
-        root.addView(supplyScroll, new LinearLayout.LayoutParams(-1, 0, 2));
-        ScrollView signalScroll = new ScrollView(this);
-        signalScroll.addView(signalSummary);
-        root.addView(signalScroll, new LinearLayout.LayoutParams(-1, 0, 3));
-        ScrollView riskScroll = new ScrollView(this); riskScroll.addView(entryRiskSummary);
-        root.addView(riskScroll, new LinearLayout.LayoutParams(-1, 0, 2));
-        ScrollView journeyScroll = new ScrollView(this); journeyScroll.addView(marketJourneySummary);
-        root.addView(journeyScroll, new LinearLayout.LayoutParams(-1, 0, 3));
-        ScrollView alertScroll = new ScrollView(this); alertScroll.addView(alertSummary);
-        root.addView(alertScroll, new LinearLayout.LayoutParams(-1, 0, 2));
-        ScrollView logScroll = new ScrollView(this);
-        logScroll.addView(log);
-        root.addView(logScroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        price=text("--",30,0xFFFFFFFF);bidAsk=text("Bid: DATA UNAVAILABLE  •  Ask: DATA UNAVAILABLE  •  Spread: DATA UNAVAILABLE",12,0xFFB8C7D9);
+        timestamp=text("Timestamp: menunggu data",10,0xFF91A2B8);
+        status=text("DISCONNECTED",12,0xFFFFC857);source=text("Sumber: BiQuote",10,0xFF91A2B8);
+        candleSummary=text("OHLC: menunggu data",10,0xFFB8C7D9);
+        indicatorSummary=text("INDICATOR CENTER — menunggu candle tertutup yang valid.",12,0xFFEAF2FF);
+        patternSummary=text("CANDLE PATTERN ENGINE: menunggu data.",11,0xFFB8C7D9);
+        structureSummary=text("MARKET STRUCTURE: menunggu data.",11,0xFFB8C7D9);
+        supplySummary=text("SUPPLY / DEMAND: menunggu data.",11,0xFFB8C7D9);
+        signalSummary=text("SIGNAL CENTER: menunggu data tervalidasi.",12,0xFFEAF2FF);
+        entryRiskSummary=text("ENTRY / RISK PLAN: menunggu data tervalidasi.",12,0xFFEAF2FF);
+        marketJourneySummary=text("MARKET JOURNEY: menunggu quote dan level aktual.",12,0xFFEAF2FF);
+        alertSummary=text("ALERT HISTORY: belum ada peristiwa.",11,0xFFB8C7D9);
+        log=text("Log koneksi dan candle…",10,0xFF91A2B8);
+        economicNewsSummary=text("DATA UNAVAILABLE — kalender ekonomi belum dikonfigurasi. Angka tidak direkayasa.",12,0xFFB8C7D9);
+
+        pageHost=new LinearLayout(this);pageHost.setOrientation(LinearLayout.VERTICAL);
+        root.addView(pageHost,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout livePage=new LinearLayout(this);livePage.setOrientation(LinearLayout.VERTICAL);
+        livePage.addView(price,matchWrap());livePage.addView(bidAsk,matchWrap());
+        livePage.addView(status,matchWrap());livePage.addView(timestamp,matchWrap());livePage.addView(source,matchWrap());
+        LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button refresh=new Button(this);refresh.setText("REFRESH");refresh.setTextSize(11);
+        refresh.setOnClickListener(v->{if(engine!=null)engine.refresh();else Toast.makeText(this,"Tick dipantau Foreground Service",Toast.LENGTH_SHORT).show();});
+        Button refreshCandles=new Button(this);refreshCandles.setText("REFRESH OHLC");refreshCandles.setTextSize(11);
+        refreshCandles.setOnClickListener(v->{if(candleEngine!=null)candleEngine.refreshAll();else Toast.makeText(this,"Candle dipantau Foreground Service",Toast.LENGTH_SHORT).show();});
+        actions.addView(refresh,new LinearLayout.LayoutParams(0,44,1));actions.addView(refreshCandles,new LinearLayout.LayoutParams(0,44,1));livePage.addView(actions);
+        LinearLayout tfRow=new LinearLayout(this);tfRow.setOrientation(LinearLayout.HORIZONTAL);
+        android.widget.HorizontalScrollView tfScroll=new android.widget.HorizontalScrollView(this);tfScroll.setHorizontalScrollBarEnabled(false);
+        for(CandleTimeframe tf:CandleTimeframe.values()){final CandleTimeframe choice=tf;Button t=new Button(this);t.setText(tf.name());t.setTextSize(10);t.setMinWidth(0);t.setPadding(7,2,7,2);t.setOnClickListener(v->{selectedTimeframe=choice;updateChartFromSnapshots();});tfRow.addView(t,new LinearLayout.LayoutParams(-2,40));}
+        tfScroll.addView(tfRow);livePage.addView(tfScroll,matchWrap());
+        chartView=new LiveCandleChartView(this);livePage.addView(chartView,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout overlays=new LinearLayout(this);overlays.setOrientation(LinearLayout.HORIZONTAL);
+        Button ema=new Button(this);ema.setText("EMA: OFF");ema.setTextSize(10);ema.setOnClickListener(v->{String[] opts={"OFF","10","20","50","100","200"};int idx=0;for(int i=0;i<opts.length;i++)if(opts[i].equals(selectedEma))idx=i;selectedEma=opts[(idx+1)%opts.length];chartView.setEma(selectedEma);ema.setText("EMA: "+selectedEma);});
+        Button indicator=new Button(this);indicator.setText("INDICATOR: RSI14");indicator.setTextSize(10);indicator.setOnClickListener(v->{String[] opts={"RSI14","MOM14","ADX14","ATR14"};int idx=0;for(int i=0;i<opts.length;i++)if(opts[i].equals(selectedChartIndicator))idx=i;selectedChartIndicator=opts[(idx+1)%opts.length];indicator.setText("INDICATOR: "+selectedChartIndicator);updateChartIndicatorLabel();});
+        overlays.addView(ema,new LinearLayout.LayoutParams(0,40,1));overlays.addView(indicator,new LinearLayout.LayoutParams(0,40,1));livePage.addView(overlays);
+        chartIndicatorLabel=text("RSI14: DATA UNAVAILABLE",10,0xFFFFD166);livePage.addView(chartIndicatorLabel,matchWrap());
+        livePage.addView(candleSummary,matchWrap());
+        addPage(livePage);
+
+        LinearLayout journeyPage=scrollPage();journeyPage.addView(marketJourneySummary,matchWrap());journeyPage.addView(supplySummary,matchWrap());journeyPage.addView(structureSummary,matchWrap());addPage(journeyPage);
+        LinearLayout indicatorPage=scrollPage();indicatorPage.addView(indicatorSummary,matchWrap());addPage(indicatorPage);
+        LinearLayout signalPage=scrollPage();signalPage.addView(signalSummary,matchWrap());signalPage.addView(entryRiskSummary,matchWrap());addPage(signalPage);
+        LinearLayout newsPage=scrollPage();newsPage.addView(text("ECONOMIC CALENDAR",15,0xFFFFFFFF),matchWrap());
+        Button configureCalendar=new Button(this);configureCalendar.setText("ATUR SUMBER KALENDER EKONOMI");configureCalendar.setOnClickListener(v->configureCalendarEndpoint());newsPage.addView(configureCalendar,matchWrap());
+        Button refreshCalendar=new Button(this);refreshCalendar.setText("REFRESH ECONOMIC CALENDAR");refreshCalendar.setOnClickListener(v->fetchEconomicCalendar());newsPage.addView(refreshCalendar,matchWrap());
+        newsPage.addView(economicNewsSummary,matchWrap());addPage(newsPage);
+        LinearLayout notificationPage=scrollPage();addNotificationControls(notificationPage);addMonitoringControls(notificationPage);
+        notificationPage.addView(text("RIWAYAT ALERT PASAR",15,0xFFFFFFFF),matchWrap());notificationPage.addView(alertSummary,matchWrap());
+        notificationPage.addView(text("LOG KONEKSI",15,0xFFFFFFFF),matchWrap());notificationPage.addView(log,matchWrap());addPage(notificationPage);
+        showPage(0);
         setContentView(root);
         requestNotificationPermission();
         if(backgroundMonitoring){
@@ -223,6 +216,33 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         }
         newsHandler.post(newsTicker);
         if(!calendarEndpoint.trim().isEmpty()) fetchEconomicCalendar();
+    }
+
+
+    private LinearLayout scrollPage(){LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(8,8,8,20);ScrollView scroll=new ScrollView(this);scroll.setFillViewport(false);scroll.addView(content);LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.addView(scroll,new LinearLayout.LayoutParams(-1,-1));return page;}
+    private void addPage(View page){appPages.add(page);pageHost.addView(page,new LinearLayout.LayoutParams(-1,-1));}
+    private void showPage(int index){for(int i=0;i<appPages.size();i++)appPages.get(i).setVisibility(i==index?View.VISIBLE:View.GONE);}
+    private void updateChartFromSnapshots(){
+        if(chartView==null)return;CandleEngine.Snapshot snap=latestSnapshots.get(selectedTimeframe);
+        java.util.List<LiveCandleChartView.Zone> zones=new java.util.ArrayList<>();
+        double sup=Double.NaN,res=Double.NaN;
+        if(snap!=null){
+            double current=snap.closed.isEmpty()?Double.NaN:snap.closed.get(snap.closed.size()-1).close;
+            SupplyDemandEngine.Result z=new SupplyDemandEngine().analyze(snap,current,System.currentTimeMillis());
+            for(SupplyDemandEngine.Zone item:z.activeZones())zones.add(new LiveCandleChartView.Zone(item.lower,item.upper,item.type==SupplyDemandEngine.ZoneType.DEMAND,item.label));
+            IndicatorEngine.Result ir=new IndicatorEngine().calculate(snap,latestSnapshots.get(CandleTimeframe.D1),System.currentTimeMillis());
+            if(!ir.swingSupports.isEmpty())sup=ir.swingSupports.get(ir.swingSupports.size()-1);
+            if(!ir.swingResistances.isEmpty())res=ir.swingResistances.get(ir.swingResistances.size()-1);
+        }
+        chartView.setData(snap==null?java.util.Collections.emptyList():snap.closed,zones,selectedTimeframe.name(),sup,res);
+        chartView.setEma(selectedEma);updateChartIndicatorLabel();
+    }
+    private void updateChartIndicatorLabel(){
+        if(chartIndicatorLabel==null)return;CandleEngine.Snapshot snap=latestSnapshots.get(selectedTimeframe);
+        if(snap==null){chartIndicatorLabel.setText(selectedChartIndicator+": DATA UNAVAILABLE");return;}
+        IndicatorEngine.Result r=new IndicatorEngine().calculate(snap,latestSnapshots.get(CandleTimeframe.D1),System.currentTimeMillis());
+        Double v="MOM14".equals(selectedChartIndicator)?r.momentum14:"ADX14".equals(selectedChartIndicator)?r.adx14:"ATR14".equals(selectedChartIndicator)?r.atr14:r.rsi14;
+        chartIndicatorLabel.setText(selectedChartIndicator+" • "+fmt(v)+" • "+r.validity+" • "+snap.sourceStatus);
     }
 
     private TextView text(String value, int size, int color) {
@@ -259,6 +279,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     @Override public void onUpdated(Map<CandleTimeframe, CandleEngine.Snapshot> snapshots) {
         runOnUiThread(() -> {
             latestSnapshots=snapshots;
+            updateChartFromSnapshots();
             renderEconomicNews(snapshots);
             dispatchEconomicAlerts(System.currentTimeMillis());
             StringBuilder out = new StringBuilder("TIMEFRAME | CLOSED | RUNNING | LAST CANDLE UTC | STATUS | TYPE\n");
