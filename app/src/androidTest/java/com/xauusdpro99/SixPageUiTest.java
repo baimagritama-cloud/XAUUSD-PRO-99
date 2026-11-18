@@ -68,10 +68,16 @@ public final class SixPageUiTest {
         for (String page : PAGES) {
             UiObject2 nav = device.findObject(By.text(page));
             if (nav == null) {
-                // The navigation is horizontally scrollable; reveal later tabs.
-                device.swipe(device.getDisplayWidth() - 40, 150, 40, 150, 25);
+                // Reveal later tabs; the strip may still be scrolled to the end after rotation.
+                int y = Math.max(80, device.getDisplayHeight() / 12);
+                device.swipe(device.getDisplayWidth() - 40, y, 40, y, 25);
                 device.waitForIdle();
                 nav = device.findObject(By.text(page));
+                if (nav == null) {
+                    device.swipe(40, y, device.getDisplayWidth() - 40, y, 25);
+                    device.waitForIdle();
+                    nav = device.findObject(By.text(page));
+                }
             }
             if (nav == null) throw new AssertionError("Navigation tab not found: " + page);
             nav.click();
