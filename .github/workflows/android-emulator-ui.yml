@@ -39,52 +39,13 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 900
           script: |
-            set +e
             adb wait-for-device
-
-            # ADB connectivity alone does not mean Android's package/activity
-            # managers are ready. Wait until boot and both core services respond.
-            READY=0
-            for attempt in $(seq 1 120); do
-              BOOT=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')
-              PACKAGE=$(adb shell service check package 2>/dev/null)
-              ACTIVITY=$(adb shell service check activity 2>/dev/null)
-              if [ "$BOOT" = "1" ] && echo "$PACKAGE" | grep -q "found" && echo "$ACTIVITY" | grep -q "found"; then
-                READY=1
-                echo "Android is ready: boot_completed=$BOOT; package and activity services are available."
-                break
-              fi
-              echo "Waiting for Android framework ($attempt/120): boot=$BOOT package=$PACKAGE activity=$ACTIVITY"
-              sleep 5
-            done
-
-            if [ "$READY" -ne 1 ]; then
-              echo "Android framework did not become ready. Diagnostic snapshot:"
-              adb shell getprop sys.boot_completed
-              adb shell service check package
-              adb shell service check activity
-              adb shell getprop | grep -E 'init.svc.(zygote|system_server)|sys.boot_completed'
-              exit 1
-            fi
-
+            adb shell getprop sys.boot_completed | grep -q '^1$'
+            adb shell service check package | grep -q found
+            adb shell service check activity | grep -q found
             adb shell cmd package list packages >/dev/null
             adb shell am get-current-user
-            gradle --no-daemon :app:connectedDebugAndroidTest
-            TEST_EXIT=$?
-
-            mkdir -p artifacts/ui-screenshots
-            adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots
-            PULL_EXIT=$?
-            echo "Captured screenshots:"
-            find artifacts/ui-screenshots -maxdepth 1 -type f -name '*.png' -printf '%f (%s bytes)\\n' | sort
-
-            if [ "$TEST_EXIT" -ne 0 ]; then exit "$TEST_EXIT"; fi
-            if [ "$PULL_EXIT" -ne 0 ]; then exit "$PULL_EXIT"; fi
-            COUNT=$(find artifacts/ui-screenshots -maxdepth 1 -type f -name '*.png' | wc -l)
-            if [ "$COUNT" -ne 12 ]; then
-              echo "Expected 12 screenshots, found $COUNT"
-              exit 1
-            fi
+            gradle --no-daemon :app:connectedDebugAndroidTest && mkdir -p artifacts/ui-screenshots && adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots && test "$(find artifacts/ui-screenshots -maxdepth 1 -type f -name '*.png' | wc -l)" -eq 12
 
       - name: Upload UI screenshots and instrumentation reports
         if: always()
