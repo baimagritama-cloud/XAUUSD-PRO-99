@@ -38,13 +38,13 @@ public final class SixPageUiTest {
             throw new AssertionError("Cannot create UI debug directory: " + debug);
         }
 
-        // Start from the launcher, grant the runtime permission before app startup,
-        // and explicitly launch the real Activity instead of binding ActivityScenario
-        // to a second instrumentation lifecycle.
+        // Start from the launcher and grant the runtime permission before app startup.
+        // Do not force-stop the target package here: Android may host the instrumentation
+        // runner in that package process, so force-stop can kill the test runner itself.
+        // Launch the real Activity directly without restarting the instrumentation process.
         device.pressHome();
         device.setOrientationPortrait();
         device.executeShellCommand("pm grant " + PACKAGE + " android.permission.POST_NOTIFICATIONS");
-        device.executeShellCommand("am force-stop " + PACKAGE);
         device.executeShellCommand("am start -W -n " + PACKAGE + "/.MainActivity");
 
         boolean appVisible = device.wait(Until.hasObject(By.pkg(PACKAGE)), 60_000);
