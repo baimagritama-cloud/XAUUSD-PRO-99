@@ -10,9 +10,9 @@ permissions:
 
 jobs:
   emulator-ui:
-    name: Six-page portrait and landscape UI test
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    name: Isolated UI and live-monitoring integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,12 +28,11 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      # Compile before starting the emulator so Gradle compilation does not
-      # compete with Android system_server on the emulator's limited CPU.
-      - name: Build app and instrumentation APKs before emulator startup
-        run: gradle --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Build app, unit tests, and instrumentation APKs
+        run: |
+          gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
 
-      - name: Run tests and collect screenshots while emulator is alive
+      - name: Run orchestrated tests and collect diagnostics before emulator teardown
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -45,13 +44,68 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 900
           script: |
-            sh -c 'set +e; mkdir -p artifacts/diagnostics artifacts/ui-screenshots; adb wait-for-device; i=0; ready=0; while [ "$i" -lt 90 ]; do boot=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r"); pkg=$(adb shell service check package 2>&1); act=$(adb shell service check activity 2>&1); net=$(adb shell service check connectivity 2>&1); if [ "$boot" = "1" ] && echo "$pkg" | grep -q found && echo "$act" | grep -q found && echo "$net" | grep -q found; then ready=1; break; fi; sleep 2; i=$((i+1)); done; if [ "$ready" -ne 1 ]; then adb logcat -d -v threadtime > artifacts/diagnostics/boot-failure-logcat.txt; echo "Android framework services did not become ready"; exit 22; fi; sleep 30; pkg=$(adb shell service check package 2>&1); act=$(adb shell service check activity 2>&1); if ! echo "$pkg" | grep -q found || ! echo "$act" | grep -q found; then adb logcat -d -v threadtime > artifacts/diagnostics/unstable-framework-logcat.txt; echo "Android framework services became unavailable during stability window"; exit 23; fi; adb logcat -c; gradle --no-daemon :app:connectedDebugAndroidTest; result=$?; adb logcat -d -v threadtime > artifacts/diagnostics/logcat.txt; adb shell dumpsys activity processes > artifacts/diagnostics/activity-processes.txt 2>&1; adb shell dumpsys package com.xauusdpro99 > artifacts/diagnostics/app-package.txt 2>&1; adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots >/dev/null 2>&1 || true; count=$(find artifacts/ui-screenshots -type f \( -name "portrait_*.png" -o -name "landscape_*.png" \) | wc -l); echo "Instrumentation exit code=$result; page screenshot count=$count"; if [ "$result" -ne 0 ]; then exit "$result"; fi; [ "$count" -eq 12 ]'
+            set -Eeuo pipefail
+            mkdir -p artifacts/diagnostics artifacts/ui-screenshots
+            collect_diagnostics() {
+              result=$?
+              set +e
+              echo "Collecting emulator diagnostics (exit=$result)"
+              adb devices -l > artifacts/diagnostics/adb-devices.txt 2>&1
+              adb version > artifacts/diagnostics/adb-version.txt 2>&1
+              adb shell getprop > artifacts/diagnostics/device-properties.txt 2>&1
+              adb logcat -b all -d -v threadtime > artifacts/diagnostics/logcat-all.txt 2>&1
+              adb shell dumpsys cpuinfo > artifacts/diagnostics/cpuinfo.txt 2>&1
+              adb shell dumpsys meminfo > artifacts/diagnostics/meminfo.txt 2>&1
+              adb shell dumpsys activity processes > artifacts/diagnostics/activity-processes.txt 2>&1
+              adb shell dumpsys activity services com.xauusdpro99 > artifacts/diagnostics/activity-services.txt 2>&1
+              adb shell pm list instrumentation > artifacts/diagnostics/instrumentations.txt 2>&1
+              adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots >/dev/null 2>&1
+              echo "Collected screenshot files:"
+              find artifacts/ui-screenshots -type f -name '*.png' -print 2>/dev/null
+              return 0
+            }
+            trap collect_diagnostics EXIT
 
-      - name: Upload UI screenshots and instrumentation diagnostics
+            adb start-server
+            timeout 120 adb wait-for-device
+            ready=0
+            for attempt in $(seq 1 180); do
+              boot=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
+              pkg=$(adb shell service check package 2>&1 || true)
+              activity=$(adb shell service check activity 2>&1 || true)
+              connectivity=$(adb shell service check connectivity 2>&1 || true)
+              if [ "$boot" = "1" ] && echo "$pkg" | grep -q found && echo "$activity" | grep -q found && echo "$connectivity" | grep -q found; then
+                ready=1
+                break
+              fi
+              sleep 2
+            done
+            if [ "$ready" -ne 1 ]; then
+              echo "Android framework did not become ready within 6 minutes"
+              exit 22
+            fi
+
+            # Require a short stable framework window before starting instrumentation.
+            for attempt in $(seq 1 10); do
+              adb shell service check package | grep -q found
+              adb shell service check activity | grep -q found
+              sleep 2
+            done
+            adb logcat -c
+
+            # Gradle invokes Android Test Orchestrator from testOptions; each @Test
+            # gets a separate Instrumentation invocation. App features remain enabled.
+            gradle --no-daemon :app:connectedDebugAndroidTest
+
+            count=$(find artifacts/ui-screenshots -type f \( -name 'portrait_*.png' -o -name 'landscape_*.png' \) | wc -l)
+            echo "Expected 12 page screenshots; found $count"
+            [ "$count" -eq 12 ]
+
+      - name: Upload UI screenshots and full diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: XAUUSD-PRO-99-emulator-ui-evidence
+          name: XAUUSD-PRO-99-orchestrated-ui-integration-evidence
           path: |
             artifacts/ui-screenshots/**
             artifacts/diagnostics/**
