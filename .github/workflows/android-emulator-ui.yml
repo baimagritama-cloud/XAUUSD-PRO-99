@@ -40,8 +40,8 @@ jobs:
           target: default
           arch: x86_64
           profile: pixel_2
-          cores: 4
-          emulator-options: -memory 4096 -no-window -gpu swiftshader_indirect -no-snapshot -no-audio -no-boot-anim -camera-back none -camera-front none
+          cores: 2
+          emulator-options: -memory 3072 -no-window -gpu swiftshader -no-snapshot -no-audio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           emulator-boot-timeout: 900
           script: |
