@@ -12,6 +12,8 @@ import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
 
+import com.xauusdpro99.monitoring.MarketMonitoringService;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -26,63 +28,145 @@ public final class SixPageUiTest {
     };
 
     @Test
-    public void navigateAllPagesAndCapturePortraitLandscapeScreenshots() throws Exception {
-        UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+    public void allSixPagesRenderInPortrait() throws Exception {
+        UiDevice device = device();
+        File output = outputDirectory();
+        launchApp(device, true);
+        exerciseChartControls(device);
+        captureAllPages(device, output, "portrait");
+        assertScreenshots(output, "portrait");
+    }
+
+    @Test
+    public void allSixPagesRenderInLandscape() throws Exception {
+        UiDevice device = device();
+        File output = outputDirectory();
+        launchApp(device, false);
+        exerciseChartControls(device);
+        captureAllPages(device, output, "landscape");
+        assertScreenshots(output, "landscape");
+    }
+
+    @Test
+    public void liveMarketAndBackgroundMonitoringRemainActiveAfterLeavingApp() throws Exception {
+        UiDevice device = device();
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        launchApp(device, true);
+
+        // Start the real production foreground service; no fake feed or disabled feature flags.
+        MarketMonitoringService.start(context);
+        Context app = context.getApplicationContext();
+        long deadline = System.currentTimeMillis() + 45_000L;
+        boolean running = false;
+        String connection = "";
+        while (System.currentTimeMillis() < deadline) {
+            android.content.SharedPreferences runtime =
+                app.getSharedPreferences("monitoring_runtime", Context.MODE_PRIVATE);
+            running = runtime.getBoolean("service_running", false);
+            connection = runtime.getString("connection_status", "");
+            if (running && !connection.isEmpty()) break;
+            Thread.sleep(500);
+        }
+
+        assertTrue("Foreground Background Monitoring service did not report RUNNING",
+            app.getSharedPreferences("monitoring_runtime", Context.MODE_PRIVATE)
+                .getBoolean("service_running", false));
+        assertTrue("SignalR connection lifecycle did not publish a status (LIVE/STALE/RECONNECTING/ERROR)",
+            !connection.isEmpty());
+
+        // Verify the foreground service survives moving the UI task to the background.
+        device.pressHome();
+        Thread.sleep(3_000L);
+        assertTrue("Background Monitoring stopped after leaving the app",
+            app.getSharedPreferences("monitoring_runtime", Context.MODE_PRIVATE)
+                .getBoolean("service_running", false));
+        assertTrue("SignalR status was lost while the app was backgrounded",
+            !app.getSharedPreferences("monitoring_runtime", Context.MODE_PRIVATE)
+                .getString("connection_status", "").isEmpty());
+    }
+
+    private static UiDevice device() {
+        return UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+    }
+
+    private static File outputDirectory() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         File output = new File(context.getExternalFilesDir(null), "ui-screenshots");
         if (!output.exists() && !output.mkdirs()) {
             throw new AssertionError("Cannot create screenshot directory: " + output);
         }
-        File debug = new File(output, "debug");
-        if (!debug.exists() && !debug.mkdirs()) {
-            throw new AssertionError("Cannot create UI debug directory: " + debug);
-        }
+        return output;
+    }
 
-        // Start from the launcher and grant the runtime permission before app startup.
-        // Do not force-stop the target package here: Android may host the instrumentation
-        // runner in that package process, so force-stop can kill the test runner itself.
-        // Launch the real Activity directly without restarting the instrumentation process.
+    private static void launchApp(UiDevice device, boolean portrait) throws Exception {
         device.pressHome();
-        device.setOrientationPortrait();
+        if (portrait) device.setOrientationPortrait();
+        else device.setOrientationLandscape();
         device.executeShellCommand("pm grant " + PACKAGE + " android.permission.POST_NOTIFICATIONS");
         device.executeShellCommand("am start -W -n " + PACKAGE + "/.MainActivity");
+        boolean visible = device.wait(Until.hasObject(By.pkg(PACKAGE)), 60_000L);
+        UiObject2 refresh = waitForText(device, "REFRESH", 60_000L);
+        assertTrue("App did not become visible; foreground=" + device.getCurrentPackageName(),
+            visible && refresh != null);
+    }
 
-        boolean appVisible = device.wait(Until.hasObject(By.pkg(PACKAGE)), 60_000);
-        UiObject2 refresh = waitForText(device, "REFRESH", 60_000);
-        if (!appVisible || refresh == null) {
-            device.takeScreenshot(new File(debug, "initial-screen.png"));
-            device.dumpWindowHierarchy(new File(debug, "initial-hierarchy.xml"));
-            throw new AssertionError("App/control not visible. foreground="
-                + device.getCurrentPackageName() + ", appVisible=" + appVisible
-                + ", REFRESH found=" + (refresh != null));
-        }
-
-        // Exercise live-chart controls before collecting page evidence.
+    private static void exerciseChartControls(UiDevice device) {
         click(device, "REFRESH");
         click(device, "REFRESH OHLC");
         click(device, "M1");
         click(device, "EMA: OFF");
         click(device, "INDICATOR: RSI14");
         device.waitForIdle();
+    }
 
-        captureAllPages(device, output, "portrait", debug);
-
-        device.setOrientationLandscape();
-        device.waitForIdle();
-        captureAllPages(device, output, "landscape", debug);
-
-        device.setOrientationNatural();
-        device.waitForIdle();
-
-        String[] expected = new String[12];
-        int index = 0;
-        for (String orientation : new String[]{"portrait", "landscape"}) {
-            for (String page : PAGES) {
-                expected[index++] = orientation + "_" + page.toLowerCase().replace(' ', '_') + ".png";
+    private static void captureAllPages(UiDevice device, File output, String orientation) throws Exception {
+        File debug = new File(output, "debug");
+        if (!debug.exists()) debug.mkdirs();
+        for (String page : PAGES) {
+            UiObject2 nav = waitForText(device, page, 10_000L);
+            if (nav == null) {
+                int y = Math.max(80, device.getDisplayHeight() / 12);
+                device.swipe(device.getDisplayWidth() - 40, y, 40, y, 25);
+                device.waitForIdle();
+                nav = waitForText(device, page, 3_000L);
+                if (nav == null) {
+                    device.swipe(40, y, device.getDisplayWidth() - 40, y, 25);
+                    device.waitForIdle();
+                    nav = waitForText(device, page, 3_000L);
+                }
             }
+            if (nav == null) {
+                device.takeScreenshot(new File(debug, orientation + "_missing_" + page.replace(' ', '_') + ".png"));
+                device.dumpWindowHierarchy(new File(debug, orientation + "_missing_" + page.replace(' ', '_') + ".xml"));
+                throw new AssertionError("Navigation tab not found: " + page);
+            }
+            nav.click();
+            device.waitForIdle();
+            String anchor = page.equals("MARKET JOURNEY") ? "MARKET JOURNEY"
+                : page.equals("INDICATOR CENTER") ? "INDICATORS (closed candles only)"
+                : page.equals("SIGNAL CENTER") ? "SIGNAL CENTER"
+                : page.equals("NEWS") ? "ECONOMIC CALENDAR"
+                : page.equals("NOTIFICATIONS") ? "VOICE ENGINE & NOTIFICATION CENTER"
+                : "XAUUSD PRO 99";
+            if (!device.wait(Until.hasObject(By.textContains(anchor)), 10_000L)) {
+                device.takeScreenshot(new File(debug, orientation + "_missing_content_" + page.replace(' ', '_') + ".png"));
+                device.dumpWindowHierarchy(new File(debug, orientation + "_missing_content_" + page.replace(' ', '_') + ".xml"));
+                throw new AssertionError("Page content not visible after navigation: " + page);
+            }
+            if (page.equals("NEWS")) click(device, "REFRESH ECONOMIC CALENDAR");
+            else if (page.equals("NOTIFICATIONS")) clickOneOf(device, "SUARA: AKTIF", "SUARA: NONAKTIF");
+            Thread.sleep(350L);
+            File screenshot = new File(output,
+                orientation + "_" + page.toLowerCase().replace(' ', '_') + ".png");
+            assertTrue("Screenshot failed for " + page + " (" + orientation + ")",
+                device.takeScreenshot(screenshot));
         }
-        for (String name : expected) {
-            File screenshot = new File(output, name);
+    }
+
+    private static void assertScreenshots(File output, String orientation) {
+        for (String page : PAGES) {
+            File screenshot = new File(output,
+                orientation + "_" + page.toLowerCase().replace(' ', '_') + ".png");
             assertTrue("Missing or empty screenshot: " + screenshot,
                 screenshot.isFile() && screenshot.length() > 0);
         }
@@ -94,63 +178,16 @@ public final class SixPageUiTest {
         return device.findObject(selector);
     }
 
-    private static void captureAllPages(UiDevice device, File output, String orientation, File debug) throws Exception {
-        for (String page : PAGES) {
-            UiObject2 nav = waitForText(device, page, 10_000);
-            if (nav == null) {
-                int y = Math.max(80, device.getDisplayHeight() / 12);
-                device.swipe(device.getDisplayWidth() - 40, y, 40, y, 25);
-                device.waitForIdle();
-                nav = waitForText(device, page, 3_000);
-                if (nav == null) {
-                    device.swipe(40, y, device.getDisplayWidth() - 40, y, 25);
-                    device.waitForIdle();
-                    nav = waitForText(device, page, 3_000);
-                }
-            }
-            if (nav == null) {
-                device.takeScreenshot(new File(debug, orientation + "_missing_" + page.replace(' ', '_') + ".png"));
-                device.dumpWindowHierarchy(new File(debug, orientation + "_missing_" + page.replace(' ', '_') + ".xml"));
-                throw new AssertionError("Navigation tab not found: " + page
-                    + "; foreground=" + device.getCurrentPackageName());
-            }
-            nav.click();
-            device.waitForIdle();
-            String anchor = page.equals("MARKET JOURNEY") ? "MARKET JOURNEY"
-                : page.equals("INDICATOR CENTER") ? "INDICATORS (closed candles only)"
-                : page.equals("SIGNAL CENTER") ? "SIGNAL CENTER"
-                : page.equals("NEWS") ? "ECONOMIC CALENDAR"
-                : page.equals("NOTIFICATIONS") ? "VOICE ENGINE & NOTIFICATION CENTER"
-                : "XAUUSD PRO 99";
-            if (!device.wait(Until.hasObject(By.textContains(anchor)), 10_000)) {
-                device.takeScreenshot(new File(debug, orientation + "_missing_content_" + page.replace(' ', '_') + ".png"));
-                device.dumpWindowHierarchy(new File(debug, orientation + "_missing_content_" + page.replace(' ', '_') + ".xml"));
-                throw new AssertionError("Page content not visible after navigation: " + page);
-            }
-            if (page.equals("NEWS")) {
-                click(device, "REFRESH ECONOMIC CALENDAR");
-            } else if (page.equals("NOTIFICATIONS")) {
-                clickOneOf(device, "SUARA: AKTIF", "SUARA: NONAKTIF");
-            }
-            Thread.sleep(350);
-            File screenshot = new File(output,
-                orientation + "_" + page.toLowerCase().replace(' ', '_') + ".png");
-            assertTrue("Screenshot failed for " + page + " (" + orientation + ")",
-                device.takeScreenshot(screenshot));
-        }
-    }
-
     private static void click(UiDevice device, String text) {
-        UiObject2 control = waitForText(device, text, 15_000);
-        if (control == null) throw new AssertionError("Expected control not found: " + text
-            + "; foreground=" + device.getCurrentPackageName());
+        UiObject2 control = waitForText(device, text, 15_000L);
+        if (control == null) throw new AssertionError("Expected control not found: " + text);
         control.click();
         device.waitForIdle();
     }
 
     private static void clickOneOf(UiDevice device, String first, String second) {
-        UiObject2 control = waitForText(device, first, 5_000);
-        if (control == null) control = waitForText(device, second, 5_000);
+        UiObject2 control = waitForText(device, first, 5_000L);
+        if (control == null) control = waitForText(device, second, 5_000L);
         if (control == null) throw new AssertionError("Neither toggle state was found: " + first + " / " + second);
         control.click();
         device.waitForIdle();
