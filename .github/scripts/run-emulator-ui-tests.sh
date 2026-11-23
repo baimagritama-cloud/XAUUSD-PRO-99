@@ -53,13 +53,12 @@ done
 
 adb logcat -c
 
-# AndroidX Test Orchestrator is configured in app/build.gradle.
+# Landscape-only stabilization phase: six pages plus live SignalR/monitoring integration.
 gradle --no-daemon :app:connectedDebugAndroidTest
 
-# Pull screenshots before validating their count.
 adb shell ls -lR /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots
 adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots
 
 count=$(find artifacts/ui-screenshots -type f -name '*.png' ! -path '*/debug/*' | wc -l)
-echo "Expected 12 page screenshots (6 pages x 2 orientations); found $count"
-[[ "$count" -eq 12 ]]
+echo "Expected 6 landscape page screenshots; found $count"
+[[ "$count" -eq 6 ]]
