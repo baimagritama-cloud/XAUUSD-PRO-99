@@ -85,20 +85,32 @@ sleep 20
 
 adb logcat -c
 
-# Landscape-only UI run; keeps all six pages and live SignalR/background monitoring test.
-gradle --no-daemon :app:connectedDebugAndroidTest
+# Stage 1: run only the six-page landscape UI test. The portrait method remains
+# in source but is @Ignore during this stabilization phase.
+echo "STAGE 1/2: six-page landscape UI test"
+gradle --no-daemon :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.xauusdpro99.SixPageUiTest#allSixPagesRenderInLandscape
 
-# Export all screenshots and hierarchy snapshots from the instrumentation cache.
+# Export screenshots immediately, before another instrumentation invocation can
+# alter the runner package's private cache.
 export_instrumentation_evidence
 find artifacts/ui-screenshots/instrumentation -type f -print
 
-count=$(find artifacts/ui-screenshots -type f -name '*.png' ! -path '*/debug/*' | wc -l)
+count=$(find artifacts/ui-screenshots/instrumentation -type f -name '*.png' ! -path '*/debug/*' | wc -l)
 count=$(echo "$count" | tr -d '[:space:]')
 
-echo "Expected 6 landscape page screenshots; found $count"
+echo "STAGE 1 evidence: expected 6 landscape page screenshots; found $count"
 if [[ "$count" -ne 6 ]]; then
-  echo "ERROR: Screenshot count mismatch!"
+  echo "ERROR: Stage 1 screenshot count mismatch!"
   exit 1
 fi
+echo "STAGE 1 PASSED: all six landscape page screenshots captured."
 
-echo "Success! All 6 screenshots found."
+# Stage 2: independently verify the production Foreground Service and SignalR
+# lifecycle while the app task is backgrounded. No feature is disabled or mocked.
+echo "STAGE 2/2: live market and Background Monitoring integration test"
+gradle --no-daemon :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.xauusdpro99.SixPageUiTest#liveMarketAndBackgroundMonitoringRemainActiveAfterLeavingApp
+
+echo "STAGE 2 PASSED: Background Monitoring integration assertions completed."
+echo "ALL STAGES PASSED."
