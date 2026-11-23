@@ -95,13 +95,22 @@ public final class SixPageUiTest {
     }
 
     private static File outputDirectory() {
-        // Store evidence under the instrumentation APK's external files directory.
-        // Android Test Orchestrator may clear the target app's data between isolated tests;
-        // keeping evidence in the runner package prevents screenshots/hierarchies disappearing.
+        // Use the instrumentation package's private cache. ExternalFilesDir may be null on
+        // headless API-34 TCG emulators; private cache is always writable by the test UID.
+        // The CI script exports this directory with run-as after instrumentation completes.
         Context context = InstrumentationRegistry.getInstrumentation().getContext();
-        File output = new File(context.getExternalFilesDir(null), "ui-screenshots");
-        if (!output.exists() && !output.mkdirs()) {
-            throw new AssertionError("Cannot create screenshot directory: " + output);
+        File cache = context.getCacheDir();
+        if (cache == null || (!cache.isDirectory() && !cache.mkdirs())) {
+            throw new AssertionError("Instrumentation cache directory is unavailable: " + cache);
+        }
+        File output = new File(cache, "ui-screenshots");
+        if (!output.isDirectory() && !output.mkdirs()) {
+            throw new AssertionError("Cannot create writable screenshot directory: " + output
+                + "; cache=" + cache + "; exists=" + cache.exists()
+                + "; writable=" + cache.canWrite());
+        }
+        if (!output.isDirectory() || !output.canWrite()) {
+            throw new AssertionError("Screenshot directory is not writable: " + output);
         }
         return output;
     }
@@ -112,10 +121,15 @@ public final class SixPageUiTest {
         else device.setOrientationLandscape();
         device.executeShellCommand("pm grant " + PACKAGE + " android.permission.POST_NOTIFICATIONS");
         device.executeShellCommand("am start -W -n " + PACKAGE + "/.MainActivity");
-        boolean visible = device.wait(Until.hasObject(By.pkg(PACKAGE)), 60_000L);
-        UiObject2 refresh = waitForText(device, "REFRESH", 60_000L);
-        assertTrue("App did not become visible; foreground=" + device.getCurrentPackageName(),
-            visible && refresh != null);
+
+        // Wait for a stable app-owned navigation element, not the REFRESH button.
+        // The latter can be absent from the accessibility tree during first-frame/layout work.
+        boolean packageVisible = device.wait(Until.hasObject(By.pkg(PACKAGE)), 60_000L);
+        boolean mainUiReady = device.wait(Until.hasObject(By.text("LIVE CHART")), 60_000L);
+        assertTrue("MainActivity did not reach its first usable UI; packageVisible="
+            + packageVisible + "; liveChartTab=" + mainUiReady
+            + "; foreground=" + device.getCurrentPackageName(),
+            packageVisible && mainUiReady);
     }
 
     private static void exerciseChartControls(UiDevice device) {
