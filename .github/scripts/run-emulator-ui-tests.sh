@@ -18,20 +18,32 @@ collect_diagnostics() {
   adb shell pm list instrumentation > artifacts/diagnostics/instrumentations.txt 2>&1
 
   {
-    echo "=== instrumentation runner package ==="
+    echo "=== instrumentation runner private cache ==="
+    adb shell run-as com.xauusdpro99.test ls -lR cache/ui-screenshots 2>&1
+    echo "=== instrumentation runner external files (diagnostic only) ==="
     adb shell ls -lR /sdcard/Android/data/com.xauusdpro99.test/files/ui-screenshots 2>&1
-    echo "=== target application package ==="
-    adb shell ls -lR /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots 2>&1
   } > artifacts/diagnostics/device-screenshot-files.txt
 
-  mkdir -p artifacts/ui-screenshots/instrumentation artifacts/ui-screenshots/target-app
-  adb pull /sdcard/Android/data/com.xauusdpro99.test/files/ui-screenshots artifacts/ui-screenshots/instrumentation >/dev/null 2>&1 || true
-  adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots/target-app >/dev/null 2>&1 || true
+  export_instrumentation_evidence || true
 
   adb shell dumpsys activity activities > artifacts/diagnostics/activity-activities.txt 2>&1
   echo "Collected screenshot and hierarchy files:"
   find artifacts/ui-screenshots -type f \( -name '*.png' -o -name '*.xml' \) -print 2>/dev/null
   return 0
+}
+
+# Export files written by the instrumentation runner's private cache. This avoids
+# relying on ExternalFilesDir, which can be null on headless emulator images.
+export_instrumentation_evidence() {
+  mkdir -p artifacts/ui-screenshots/instrumentation
+  if adb shell run-as com.xauusdpro99.test test -d cache/ui-screenshots; then
+    adb exec-out run-as com.xauusdpro99.test tar -C cache -cf - ui-screenshots \
+      | tar -xf - -C artifacts/ui-screenshots/instrumentation
+  else
+    echo "Instrumentation screenshot cache not found; listing runner cache:"
+    adb shell run-as com.xauusdpro99.test ls -la cache || true
+    return 1
+  fi
 }
 
 # Collect the large diagnostic bundle only when this script fails.
