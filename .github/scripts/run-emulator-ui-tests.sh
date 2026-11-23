@@ -16,10 +16,20 @@ collect_diagnostics() {
   adb shell dumpsys activity processes > artifacts/diagnostics/activity-processes.txt 2>&1
   adb shell dumpsys activity services com.xauusdpro99 > artifacts/diagnostics/activity-services.txt 2>&1
   adb shell pm list instrumentation > artifacts/diagnostics/instrumentations.txt 2>&1
-  adb shell ls -lR /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots > artifacts/diagnostics/device-screenshot-files.txt 2>&1
-  adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots >/dev/null 2>&1
-  echo "Collected screenshot files:"
-  find artifacts/ui-screenshots -type f -name '*.png' -print 2>/dev/null
+  # Instrumentation evidence is written to the test APK's external files directory.
+  # Also inspect the target app path for evidence created by older test revisions.
+  {
+    echo "=== instrumentation runner package ==="
+    adb shell ls -lR /sdcard/Android/data/com.xauusdpro99.test/files/ui-screenshots 2>&1
+    echo "=== target application package ==="
+    adb shell ls -lR /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots 2>&1
+  } > artifacts/diagnostics/device-screenshot-files.txt
+  mkdir -p artifacts/ui-screenshots/instrumentation artifacts/ui-screenshots/target-app
+  adb pull /sdcard/Android/data/com.xauusdpro99.test/files/ui-screenshots artifacts/ui-screenshots/instrumentation >/dev/null 2>&1 || true
+  adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots/target-app >/dev/null 2>&1 || true
+  adb shell dumpsys activity activities > artifacts/diagnostics/activity-activities.txt 2>&1
+  echo "Collected screenshot and hierarchy files:"
+  find artifacts/ui-screenshots -type f \( -name '*.png' -o -name '*.xml' \) -print 2>/dev/null
   return 0
 }
 trap collect_diagnostics EXIT
