@@ -34,15 +34,30 @@ jobs:
 
       - name: Run orchestrated tests and collect diagnostics before emulator teardown
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          # GitHub-hosted Linux runners do not expose KVM. Explicitly permit
+          # the emulator's TCG software CPU backend instead of failing at launch.
+          ANDROID_I_WANT_MY_TCG: "yes"
         with:
           api-level: 34
           target: default
           arch: x86_64
           profile: pixel_2
-          cores: 4
-          emulator-options: -memory 4096 -no-window -gpu swiftshader -no-snapshot -no-audio -no-boot-anim -camera-back none -camera-front none
+          cores: 2
+          emulator-options: -memory 3072 -no-window -gpu swiftshader -no-snapshot -no-audio -no-boot-anim -camera-back none -camera-front none
+          disable-linux-hw-accel: true
           disable-animations: true
-          emulator-boot-timeout: 900
+          emulator-boot-timeout: 1200
+          pre-emulator-launch-script: |
+            set -eu
+            mkdir -p artifacts/diagnostics artifacts/ui-screenshots
+            echo "ANDROID_I_WANT_MY_TCG=${ANDROID_I_WANT_MY_TCG:-unset}" > artifacts/diagnostics/emulator-mode.txt
+            emulator -version > artifacts/diagnostics/emulator-version.txt 2>&1 || true
+            emulator -accel-check > artifacts/diagnostics/emulator-acceleration-check.txt 2>&1 || true
+            lscpu > artifacts/diagnostics/host-cpu.txt 2>&1 || true
+            if [ -f "$ANDROID_AVD_HOME/test.avd/config.ini" ]; then
+              cat "$ANDROID_AVD_HOME/test.avd/config.ini" > artifacts/diagnostics/avd-config.ini
+            fi
           script: |
             set -eu
             mkdir -p artifacts/diagnostics artifacts/ui-screenshots
@@ -59,6 +74,7 @@ jobs:
               adb shell dumpsys activity processes > artifacts/diagnostics/activity-processes.txt 2>&1
               adb shell dumpsys activity services com.xauusdpro99 > artifacts/diagnostics/activity-services.txt 2>&1
               adb shell pm list instrumentation > artifacts/diagnostics/instrumentations.txt 2>&1
+              adb shell ls -lR /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots > artifacts/diagnostics/device-screenshot-files.txt 2>&1
               adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots >/dev/null 2>&1
               echo "Collected screenshot files:"
               find artifacts/ui-screenshots -type f -name '*.png' -print 2>/dev/null
@@ -85,7 +101,7 @@ jobs:
               exit 22
             fi
 
-            # Require a short stable framework window before starting instrumentation.
+            # Confirm package/activity services remain available for a stable window.
             for attempt in $(seq 1 10); do
               adb shell service check package | grep -q found
               adb shell service check activity | grep -q found
@@ -93,12 +109,17 @@ jobs:
             done
             adb logcat -c
 
-            # Gradle invokes Android Test Orchestrator from testOptions; each @Test
-            # gets a separate Instrumentation invocation. App features remain enabled.
+            # ANDROIDX_TEST_ORCHESTRATOR is enabled in app/build.gradle.
+            # Run all instrumentation tests, including both six-page orientations
+            # and the real foreground-service/SignalR lifecycle integration test.
             gradle --no-daemon :app:connectedDebugAndroidTest
 
-            count=$(find artifacts/ui-screenshots -type f \( -name 'portrait_*.png' -o -name 'landscape_*.png' \) | wc -l)
-            echo "Expected 12 page screenshots; found $count"
+            # Screenshots are written on-device by UiAutomator. Pull them before
+            # validating the expected count (the EXIT trap is only a backup).
+            adb shell ls -lR /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots
+            adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots
+            count=$(find artifacts/ui-screenshots -type f -name '*.png' ! -path '*/debug/*' | wc -l)
+            echo "Expected 12 page screenshots (6 pages x 2 orientations); found $count"
             [ "$count" -eq 12 ]
 
       - name: Upload UI screenshots and full diagnostics
