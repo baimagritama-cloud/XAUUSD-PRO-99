@@ -104,6 +104,17 @@ if [[ "$count" -ne 6 ]]; then
   echo "ERROR: Stage 1 screenshot count mismatch!"
   exit 1
 fi
+# Preserve Stage 1's reports and logcat before Stage 2 can replace Gradle outputs.
+mkdir -p artifacts/diagnostics/stage1-test-results artifacts/diagnostics/stage1-test-reports
+if [[ -d app/build/outputs/androidTest-results/connected ]]; then
+  cp -a app/build/outputs/androidTest-results/connected/. artifacts/diagnostics/stage1-test-results/
+fi
+if [[ -d app/build/reports/androidTests/connected ]]; then
+  cp -a app/build/reports/androidTests/connected/. artifacts/diagnostics/stage1-test-reports/
+fi
+adb logcat -b all -d -v threadtime > artifacts/diagnostics/stage1-logcat.txt 2>&1
+adb logcat -c
+
 echo "STAGE 1 PASSED: all six landscape page screenshots captured."
 
 # Stage 2: independently verify the production Foreground Service and SignalR
@@ -111,6 +122,16 @@ echo "STAGE 1 PASSED: all six landscape page screenshots captured."
 echo "STAGE 2/2: live market and Background Monitoring integration test"
 gradle --no-daemon :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=com.xauusdpro99.SixPageUiTest#liveMarketAndBackgroundMonitoringRemainActiveAfterLeavingApp
+
+# Preserve Stage 2's independent test reports and logcat as separate evidence.
+mkdir -p artifacts/diagnostics/stage2-test-results artifacts/diagnostics/stage2-test-reports
+if [[ -d app/build/outputs/androidTest-results/connected ]]; then
+  cp -a app/build/outputs/androidTest-results/connected/. artifacts/diagnostics/stage2-test-results/
+fi
+if [[ -d app/build/reports/androidTests/connected ]]; then
+  cp -a app/build/reports/androidTests/connected/. artifacts/diagnostics/stage2-test-reports/
+fi
+adb logcat -b all -d -v threadtime > artifacts/diagnostics/stage2-logcat.txt 2>&1
 
 echo "STAGE 2 PASSED: Background Monitoring integration assertions completed."
 echo "ALL STAGES PASSED."
