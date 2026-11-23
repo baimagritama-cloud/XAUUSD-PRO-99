@@ -165,13 +165,13 @@ public final class SixPageUiTest {
             nav.click();
             device.waitForWindowUpdate(PACKAGE, 5_000L);
             device.waitForIdle(5_000L);
-            // Audited against the initial TextViews created by MainActivity.onCreate().
-            // The real indicator heading is "INDICATOR CENTER", not the former
-            // guessed label "INDICATORS (closed candles only)".
+            // Anchors are matched against both initial and live-rendered TextViews
+            // in MainActivity. Indicator and signal summaries change their full heading
+            // after data arrives, so use stable shared keywords for those two pages.
             String anchor = page.equals("LIVE CHART") ? "XAUUSD PRO 99"
                 : page.equals("MARKET JOURNEY") ? "MARKET JOURNEY"
-                : page.equals("INDICATOR CENTER") ? "INDICATOR CENTER"
-                : page.equals("SIGNAL CENTER") ? "SIGNAL CENTER"
+                : page.equals("INDICATOR CENTER") ? "INDICATOR"
+                : page.equals("SIGNAL CENTER") ? "SIGNAL"
                 : page.equals("NEWS") ? "ECONOMIC CALENDAR"
                 : page.equals("NOTIFICATIONS") ? "VOICE ENGINE & NOTIFICATION CENTER"
                 : null;
