@@ -165,12 +165,17 @@ public final class SixPageUiTest {
             nav.click();
             device.waitForWindowUpdate(PACKAGE, 5_000L);
             device.waitForIdle(5_000L);
-            String anchor = page.equals("MARKET JOURNEY") ? "MARKET JOURNEY"
-                : page.equals("INDICATOR CENTER") ? "INDICATORS (closed candles only)"
+            // Audited against the initial TextViews created by MainActivity.onCreate().
+            // The real indicator heading is "INDICATOR CENTER", not the former
+            // guessed label "INDICATORS (closed candles only)".
+            String anchor = page.equals("LIVE CHART") ? "XAUUSD PRO 99"
+                : page.equals("MARKET JOURNEY") ? "MARKET JOURNEY"
+                : page.equals("INDICATOR CENTER") ? "INDICATOR CENTER"
                 : page.equals("SIGNAL CENTER") ? "SIGNAL CENTER"
                 : page.equals("NEWS") ? "ECONOMIC CALENDAR"
                 : page.equals("NOTIFICATIONS") ? "VOICE ENGINE & NOTIFICATION CENTER"
-                : "XAUUSD PRO 99";
+                : null;
+            assertTrue("No audited content anchor configured for page: " + page, anchor != null);
             BySelector contentSelector = By.textContains(anchor);
             boolean contentVisible = device.wait(Until.hasObject(contentSelector), 15_000L);
             // A horizontal navigation tab can receive a tap while the scroll container is
