@@ -88,13 +88,9 @@ adb logcat -c
 # Landscape-only UI run; keeps all six pages and live SignalR/background monitoring test.
 gradle --no-daemon :app:connectedDebugAndroidTest
 
-# Screenshots are currently saved by SixPageUiTest in the instrumentation runner package.
-# Also pull the target-app location for compatibility with older test revisions.
-mkdir -p artifacts/ui-screenshots/instrumentation artifacts/ui-screenshots/target-app
-adb shell ls -lR /sdcard/Android/data/com.xauusdpro99.test/files/ui-screenshots || true
-adb shell ls -lR /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots || true
-adb pull /sdcard/Android/data/com.xauusdpro99.test/files/ui-screenshots artifacts/ui-screenshots/instrumentation || true
-adb pull /sdcard/Android/data/com.xauusdpro99/files/ui-screenshots artifacts/ui-screenshots/target-app || true
+# Export all screenshots and hierarchy snapshots from the instrumentation cache.
+export_instrumentation_evidence
+find artifacts/ui-screenshots/instrumentation -type f -print
 
 count=$(find artifacts/ui-screenshots -type f -name '*.png' ! -path '*/debug/*' | wc -l)
 count=$(echo "$count" | tr -d '[:space:]')
