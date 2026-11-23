@@ -95,7 +95,10 @@ public final class SixPageUiTest {
     }
 
     private static File outputDirectory() {
-        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        // Store evidence under the instrumentation APK's external files directory.
+        // Android Test Orchestrator may clear the target app's data between isolated tests;
+        // keeping evidence in the runner package prevents screenshots/hierarchies disappearing.
+        Context context = InstrumentationRegistry.getInstrumentation().getContext();
         File output = new File(context.getExternalFilesDir(null), "ui-screenshots");
         if (!output.exists() && !output.mkdirs()) {
             throw new AssertionError("Cannot create screenshot directory: " + output);
@@ -146,17 +149,36 @@ public final class SixPageUiTest {
                 throw new AssertionError("Navigation tab not found: " + page);
             }
             nav.click();
-            device.waitForIdle();
+            device.waitForWindowUpdate(PACKAGE, 5_000L);
+            device.waitForIdle(5_000L);
             String anchor = page.equals("MARKET JOURNEY") ? "MARKET JOURNEY"
                 : page.equals("INDICATOR CENTER") ? "INDICATORS (closed candles only)"
                 : page.equals("SIGNAL CENTER") ? "SIGNAL CENTER"
                 : page.equals("NEWS") ? "ECONOMIC CALENDAR"
                 : page.equals("NOTIFICATIONS") ? "VOICE ENGINE & NOTIFICATION CENTER"
                 : "XAUUSD PRO 99";
-            if (!device.wait(Until.hasObject(By.textContains(anchor)), 10_000L)) {
-                device.takeScreenshot(new File(debug, orientation + "_missing_content_" + page.replace(' ', '_') + ".png"));
-                device.dumpWindowHierarchy(new File(debug, orientation + "_missing_content_" + page.replace(' ', '_') + ".xml"));
-                throw new AssertionError("Page content not visible after navigation: " + page);
+            BySelector contentSelector = By.textContains(anchor);
+            boolean contentVisible = device.wait(Until.hasObject(contentSelector), 15_000L);
+            // A horizontal navigation tab can receive a tap while the scroll container is
+            // still settling on slow TCG emulators. Retry the same tab once before failing.
+            if (!contentVisible) {
+                UiObject2 retryNav = waitForText(device, page, 3_000L);
+                if (retryNav != null) {
+                    retryNav.click();
+                    device.waitForWindowUpdate(PACKAGE, 5_000L);
+                    device.waitForIdle(5_000L);
+                    contentVisible = device.wait(Until.hasObject(contentSelector), 10_000L);
+                }
+            }
+            String pageKey = page.toLowerCase().replace(' ', '_');
+            // Keep a hierarchy snapshot for every page, not only failed pages.
+            device.dumpWindowHierarchy(new File(debug, orientation + "_" + pageKey + ".xml"));
+            if (!contentVisible) {
+                device.takeScreenshot(new File(debug, orientation + "_missing_content_" + pageKey + ".png"));
+                device.dumpWindowHierarchy(new File(debug, orientation + "_missing_content_" + pageKey + ".xml"));
+                throw new AssertionError("Page content not visible after navigation: " + page
+                    + "; foreground=" + device.getCurrentPackageName()
+                    + "; expected text contains=" + anchor);
             }
             if (page.equals("NEWS")) click(device, "REFRESH ECONOMIC CALENDAR");
             else if (page.equals("NOTIFICATIONS")) clickOneOf(device, "SUARA: AKTIF", "SUARA: NONAKTIF");
