@@ -42,7 +42,7 @@ start_live_evidence_capture() {
           fi
         fi
       fi
-      sleep 2
+      sleep 5
     done
   ) &
   LIVE_WATCHER_PID=$!
