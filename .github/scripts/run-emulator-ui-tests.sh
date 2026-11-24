@@ -3,6 +3,64 @@ set -Eeuo pipefail
 
 mkdir -p artifacts/diagnostics artifacts/ui-screenshots
 
+LIVE_LOGCAT_PID=""
+LIVE_WATCHER_PID=""
+
+start_live_evidence_capture() {
+  local stage="$1"
+  local dir="artifacts/diagnostics/${stage}-live"
+  mkdir -p "$dir"
+
+  # Keep a continuous logcat stream while Gradle/UTP is running. UTP uninstalls
+  # the test APK during teardown, before the Gradle command returns on failure.
+  adb logcat -b all -v threadtime > "$dir/logcat-live.txt" 2>&1 &
+  LIVE_LOGCAT_PID=$!
+
+  (
+    last_file_count=-1
+    while true; do
+      date -u +"%Y-%m-%dT%H:%M:%SZ" >> "$dir/device-resource-samples.txt"
+      adb shell cat /proc/meminfo >> "$dir/device-resource-samples.txt" 2>&1 || true
+      adb shell cat /proc/pressure/cpu >> "$dir/device-resource-samples.txt" 2>&1 || true
+
+      adb shell pm path com.xauusdpro99.test > "$dir/test-package-path.txt" 2>&1 || true
+      adb shell pm list instrumentation > "$dir/instrumentations-live.txt" 2>&1 || true
+
+      if adb shell run-as com.xauusdpro99.test test -d cache/ui-screenshots 2>/dev/null; then
+        adb shell run-as com.xauusdpro99.test find cache/ui-screenshots -type f \
+          > "$dir/runner-cache-files.txt" 2>&1 || true
+        file_count=$(grep -c '.' "$dir/runner-cache-files.txt" 2>/dev/null || true)
+        file_count="${file_count:-0}"
+        if [[ "$file_count" -gt "$last_file_count" ]]; then
+          tmp="$dir/runner-cache.tar.tmp"
+          if adb exec-out run-as com.xauusdpro99.test tar -C cache -cf - ui-screenshots \
+              > "$tmp" 2> "$dir/runner-cache-export.err"; then
+            mv "$tmp" "$dir/runner-cache.tar"
+            last_file_count="$file_count"
+          else
+            rm -f "$tmp"
+          fi
+        fi
+      fi
+      sleep 2
+    done
+  ) &
+  LIVE_WATCHER_PID=$!
+}
+
+stop_live_evidence_capture() {
+  if [[ -n "${LIVE_WATCHER_PID:-}" ]]; then
+    kill "$LIVE_WATCHER_PID" 2>/dev/null || true
+    wait "$LIVE_WATCHER_PID" 2>/dev/null || true
+    LIVE_WATCHER_PID=""
+  fi
+  if [[ -n "${LIVE_LOGCAT_PID:-}" ]]; then
+    kill "$LIVE_LOGCAT_PID" 2>/dev/null || true
+    wait "$LIVE_LOGCAT_PID" 2>/dev/null || true
+    LIVE_LOGCAT_PID=""
+  fi
+}
+
 collect_diagnostics() {
   local result="${1:-unknown}"
   set +e
@@ -50,6 +108,7 @@ export_instrumentation_evidence() {
 on_exit() {
   local exit_code=$?
   trap - EXIT
+  stop_live_evidence_capture
   if [[ "$exit_code" -ne 0 ]]; then
     collect_diagnostics "$exit_code"
   fi
@@ -88,8 +147,10 @@ adb logcat -c
 # Stage 1: run only the six-page landscape UI test. The portrait method remains
 # in source but is @Ignore during this stabilization phase.
 echo "STAGE 1/2: six-page landscape UI test"
+start_live_evidence_capture stage1
 gradle --no-daemon :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=com.xauusdpro99.SixPageUiTest#allSixPagesRenderInLandscape
+stop_live_evidence_capture
 
 # Export screenshots immediately, before another instrumentation invocation can
 # alter the runner package's private cache.
@@ -120,8 +181,10 @@ echo "STAGE 1 PASSED: all six landscape page screenshots captured."
 # Stage 2: independently verify the production Foreground Service and SignalR
 # lifecycle while the app task is backgrounded. No feature is disabled or mocked.
 echo "STAGE 2/2: live market and Background Monitoring integration test"
+start_live_evidence_capture stage2
 gradle --no-daemon :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=com.xauusdpro99.SixPageUiTest#liveMarketAndBackgroundMonitoringRemainActiveAfterLeavingApp
+stop_live_evidence_capture
 
 # Preserve Stage 2's independent test reports and logcat as separate evidence.
 mkdir -p artifacts/diagnostics/stage2-test-results artifacts/diagnostics/stage2-test-reports
