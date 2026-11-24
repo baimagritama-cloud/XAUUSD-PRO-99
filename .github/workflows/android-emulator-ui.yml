@@ -28,6 +28,29 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Capture host CPU and memory limits
+        shell: bash
+        run: |
+          mkdir -p artifacts/diagnostics
+          {
+            echo "=== timestamp ==="
+            date -u
+            echo "=== logical CPUs ==="
+            nproc
+            echo "=== free memory ==="
+            free -h
+            echo "=== host meminfo ==="
+            cat /proc/meminfo
+            echo "=== cgroup memory limit ==="
+            cat /sys/fs/cgroup/memory.max 2>/dev/null || true
+            echo "=== cgroup memory current ==="
+            cat /sys/fs/cgroup/memory.current 2>/dev/null || true
+            echo "=== cgroup CPU quota ==="
+            cat /sys/fs/cgroup/cpu.max 2>/dev/null || true
+            echo "=== process limits ==="
+            ulimit -a
+          } > artifacts/diagnostics/host-resource-baseline.txt 2>&1
+
       - name: Build app, unit tests, and instrumentation APKs
         run: |
           gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
