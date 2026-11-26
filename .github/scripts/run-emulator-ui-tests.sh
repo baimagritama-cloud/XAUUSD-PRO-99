@@ -13,7 +13,7 @@ start_live_evidence_capture() {
 
   # Keep a continuous logcat stream while Gradle/UTP is running. UTP uninstalls
   # the test APK during teardown, before the Gradle command returns on failure.
-  adb logcat -b all -v threadtime > "$dir/logcat-live.txt" 2>&1 &
+  timeout 30 adb logcat -b all -v threadtime > "$dir/logcat-live.txt" 2>&1 &
   LIVE_LOGCAT_PID=$!
 
   (
@@ -65,15 +65,15 @@ collect_diagnostics() {
   local result="${1:-unknown}"
   set +e
   echo "Collecting emulator diagnostics (exit=$result)"
-  adb devices -l > artifacts/diagnostics/adb-devices.txt 2>&1
-  adb version > artifacts/diagnostics/adb-version.txt 2>&1
-  adb shell getprop > artifacts/diagnostics/device-properties.txt 2>&1
-  adb logcat -b all -d -v threadtime > artifacts/diagnostics/logcat-all.txt 2>&1
-  adb shell dumpsys cpuinfo > artifacts/diagnostics/cpuinfo.txt 2>&1
-  adb shell dumpsys meminfo > artifacts/diagnostics/meminfo.txt 2>&1
-  adb shell dumpsys activity processes > artifacts/diagnostics/activity-processes.txt 2>&1
-  adb shell dumpsys activity services com.xauusdpro99 > artifacts/diagnostics/activity-services.txt 2>&1
-  adb shell pm list instrumentation > artifacts/diagnostics/instrumentations.txt 2>&1
+  timeout 30 adb devices -l > artifacts/diagnostics/adb-devices.txt 2>&1
+  timeout 30 adb version > artifacts/diagnostics/adb-version.txt 2>&1
+  timeout 30 adb shell getprop > artifacts/diagnostics/device-properties.txt 2>&1
+  timeout 30 adb logcat -b all -d -v threadtime > artifacts/diagnostics/logcat-all.txt 2>&1
+  timeout 30 adb shell dumpsys cpuinfo > artifacts/diagnostics/cpuinfo.txt 2>&1
+  timeout 30 adb shell dumpsys meminfo > artifacts/diagnostics/meminfo.txt 2>&1
+  timeout 30 adb shell dumpsys activity processes > artifacts/diagnostics/activity-processes.txt 2>&1
+  timeout 30 adb shell dumpsys activity services com.xauusdpro99 > artifacts/diagnostics/activity-services.txt 2>&1
+  timeout 30 adb shell pm list instrumentation > artifacts/diagnostics/instrumentations.txt 2>&1
 
   {
     echo "=== instrumentation runner private cache ==="
@@ -84,7 +84,7 @@ collect_diagnostics() {
 
   export_instrumentation_evidence || true
 
-  adb shell dumpsys activity activities > artifacts/diagnostics/activity-activities.txt 2>&1
+  timeout 30 adb shell dumpsys activity activities > artifacts/diagnostics/activity-activities.txt 2>&1
   echo "Collected screenshot and hierarchy files:"
   find artifacts/ui-screenshots -type f \( -name '*.png' -o -name '*.xml' \) -print 2>/dev/null
   return 0
@@ -119,30 +119,41 @@ trap on_exit EXIT
 adb start-server
 timeout 120 adb wait-for-device
 
-ready=0
-for attempt in $(seq 1 180); do
-  boot=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
-  pkg=$(adb shell service check package 2>&1 || true)
-  activity=$(adb shell service check activity 2>&1 || true)
-  connectivity=$(adb shell service check connectivity 2>&1 || true)
+# Require six consecutive healthy probes with the same system_server PID.
+wait_for_stable_framework() {
+  local stage="$1" deadline=$((SECONDS + 360)) stable=0
+  local boot pkg activity connectivity packages pid previous_pid=""
+  local log="artifacts/diagnostics/${stage}-framework-readiness.txt"
+  while (( SECONDS < deadline )); do
+    boot=$(timeout 10 adb shell getprop sys.boot_completed 2>&1 | tr -d '\r' || true)
+    pkg=$(timeout 10 adb shell service check package 2>&1 | tr -d '\r' || true)
+    activity=$(timeout 10 adb shell service check activity 2>&1 | tr -d '\r' || true)
+    connectivity=$(timeout 10 adb shell service check connectivity 2>&1 | tr -d '\r' || true)
+    pid=$(timeout 10 adb shell pidof system_server 2>/dev/null | tr -d '\r' || true)
+    packages=$(timeout 15 adb shell pm path android 2>&1 | tr -d '\r' || true)
+    if [[ "$boot" == "1" && "$pkg" == "Service package: found" && "$activity" == "Service activity: found" && "$connectivity" == "Service connectivity: found" && "$pid" =~ ^[0-9]+$ && "$packages" == package:* ]]; then
+      if [[ "$pid" == "$previous_pid" ]]; then
+        stable=$((stable + 1))
+      else
+        stable=1
+      fi
+    else
+      stable=0
+    fi
+    previous_pid="$pid"
+    printf '%s stable=%s boot=%s pid=%s package=%s activity=%s connectivity=%s pm=%s\n' "$(date -u +%FT%TZ)" "$stable" "$boot" "$pid" "$pkg" "$activity" "$connectivity" "$packages" >> "$log"
+    if (( stable >= 6 )); then
+      echo "Framework stable for $stage (six consecutive probes)."
+      return 0
+    fi
+    sleep 5
+  done
+  echo "Android framework failed stability gate for $stage; see $log"
+  return 22
+}
 
-  if [[ "$boot" == "1" ]] && grep -q found <<<"$pkg" && grep -q found <<<"$activity" && grep -q found <<<"$connectivity"; then
-    ready=1
-    break
-  fi
-  sleep 2
-done
-
-if [[ "$ready" -ne 1 ]]; then
-  echo "Android framework did not become ready within 6 minutes"
-  exit 22
-fi
-
-# Additional stabilization after Android framework readiness.
-echo "Framework ready. Waiting 20s for additional stabilization..."
-sleep 20
-
-adb logcat -c
+timeout 30 adb logcat -b all -d -v threadtime > artifacts/diagnostics/pre-stage1-logcat.txt 2>&1 || true
+wait_for_stable_framework stage1
 
 # Stage 1: run only the six-page landscape UI test. The portrait method remains
 # in source but is @Ignore during this stabilization phase.
@@ -180,6 +191,7 @@ echo "STAGE 1 PASSED: all six landscape page screenshots captured."
 
 # Stage 2: independently verify the production Foreground Service and SignalR
 # lifecycle while the app task is backgrounded. No feature is disabled or mocked.
+wait_for_stable_framework stage2
 echo "STAGE 2/2: live market and Background Monitoring integration test"
 start_live_evidence_capture stage2
 gradle --no-daemon :app:connectedDebugAndroidTest \
