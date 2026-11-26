@@ -26,6 +26,20 @@ public class EconomicNewsEngineTest {
         assertFalse(e.updateJson("not-json","https://calendar.example",NOW));
         assertEquals(EconomicNewsEngine.DataStatus.INVALID,e.getDataStatus());
     }
+    @Test public void twoHourAlertDeduplicatesAndRequiresFreshData(){
+        EconomicNewsEngine e=new EconomicNewsEngine();
+        long release=java.time.Instant.parse("2027-01-15T13:15:00Z").toEpochMilli();
+        long at=release-120*60_000L;
+        assertTrue(e.updateJson(json("2027-01-15T13:15:00","null"),"https://calendar.example/api",at-60_000L));
+        assertTrue(e.evaluateAlerts(at-31_000L).isEmpty());
+        List<EconomicNewsEngine.Alert> a=e.evaluateAlerts(at);
+        assertEquals(1,a.size());
+        assertEquals(EconomicNewsEngine.AlertKind.MINUTES_120,a.get(0).kind);
+        assertTrue(e.evaluateAlerts(at+1_000L).isEmpty());
+        EconomicNewsEngine stale=new EconomicNewsEngine();
+        assertTrue(stale.updateJson(json("2027-01-15T13:15:00","null"),"https://calendar.example/api",at-31*60_000L));
+        assertTrue(stale.evaluateAlerts(at).isEmpty());
+    }
     @Test public void alertWindowsDeduplicateAndRequireLiveCalendar(){
         EconomicNewsEngine e=new EconomicNewsEngine();
         assertTrue(e.updateJson(json("2027-01-15T13:15:00","null"),"https://calendar.example/api",NOW));

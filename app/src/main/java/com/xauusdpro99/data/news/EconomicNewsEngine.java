@@ -22,7 +22,7 @@ public final class EconomicNewsEngine {
     public enum DataStatus { DATA_UNAVAILABLE, LIVE, STALE, INVALID }
     public enum Impact { HIGH, MEDIUM, LOW, UNKNOWN }
     public enum EventStatus { SCHEDULED, RELEASED, CANCELLED, UNKNOWN }
-    public enum AlertKind { MINUTES_45, MINUTES_30, RELEASE, ACTUAL_AVAILABLE }
+    public enum AlertKind { MINUTES_120, MINUTES_45, MINUTES_30, RELEASE, ACTUAL_AVAILABLE }
 
     public static final class Event {
         public final String id, name, country, source;
@@ -138,7 +138,7 @@ public final class EconomicNewsEngine {
         updatedAtMs=nowMs; events=Collections.emptyList();
     }
 
-    /** Emits each 45/30-minute alert once in a 60-second window; release/actual alerts are deduplicated. */
+    /** Emits each 120/45/30-minute alert once in a 60-second window; release/actual alerts are deduplicated. */
     public synchronized List<Alert> evaluateAlerts(long nowMs) {
         List<Alert> out=new ArrayList<>();
         markStale(nowMs);
@@ -146,6 +146,8 @@ public final class EconomicNewsEngine {
         for(Event e:events) {
             if(e.status==EventStatus.CANCELLED) continue;
             long mins=(e.releaseAtMs-nowMs)/60_000L;
+            if(Math.abs(e.releaseAtMs-(nowMs+120*60_000L))<=30_000L)
+                add(out,e,AlertKind.MINUTES_120);
             if(Math.abs(e.releaseAtMs-(nowMs+45*60_000L))<=30_000L)
                 add(out,e,AlertKind.MINUTES_45);
             if(Math.abs(e.releaseAtMs-(nowMs+30*60_000L))<=30_000L)
