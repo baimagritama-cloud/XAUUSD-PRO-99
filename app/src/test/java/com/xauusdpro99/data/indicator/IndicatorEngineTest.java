@@ -72,4 +72,58 @@ public class IndicatorEngineTest {
         assertNotNull(r.senkouB52);
         assertEquals((r.tenkan9+r.kijun26)/2d,r.senkouA,0.000001);
     }
+
+    @Test public void allEmaAndIchimokuMatchLinearTrendAnalyticalValues() {
+        IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(rising(220),CandleTimeframe.M1),daily(),NOW);
+        assertEquals(314.5,r.ema10,1e-8);
+        assertEquals(309.5,r.ema20,1e-8);
+        assertEquals(294.5,r.ema50,1e-8);
+        assertEquals(269.5,r.ema100,1e-8);
+        assertEquals(219.5,r.ema200,1e-8);
+        assertEquals(315d,r.tenkan9,1e-8);
+        assertEquals(306.5,r.kijun26,1e-8);
+        assertEquals(310.75,r.senkouA,1e-8);
+        assertEquals(293.5,r.senkouB52,1e-8);
+    }
+
+    @Test public void classicDailyPivotLevelsMatchKnownOhlc() {
+        IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(rising(220),CandleTimeframe.M1),daily(),NOW);
+        assertEquals(305d/3,r.pivot,1e-8);
+        assertEquals(340d/3,r.r1,1e-8);
+        assertEquals(365d/3,r.r2,1e-8);
+        assertEquals(400d/3,r.r3,1e-8);
+        assertEquals(280d/3,r.s1,1e-8);
+        assertEquals(245d/3,r.s2,1e-8);
+        assertEquals(220d/3,r.s3,1e-8);
+    }
+
+    @Test public void fallingTrendHasBearishMomentumAndDirectionalMovement() {
+        List<Candle> bars=new ArrayList<>();
+        for(Candle b:rising(220)){
+            double c=500-b.close;
+            bars.add(new Candle("XAUUSD",CandleTimeframe.M1,b.openTimeMs,c+0.5,c+1,c-1,c,0,0,false,"fixture",NOW));
+        }
+        IndicatorEngine.Result r=new IndicatorEngine().calculate(snapshot(bars,CandleTimeframe.M1),daily(),NOW);
+        assertEquals(0d,r.rsi14,1e-8);
+        assertEquals(181d/195d*100d,r.momentum14,1e-8);
+        assertEquals(100d,r.adx14,1e-8);
+        assertEquals(0d,r.plusDi14,1e-8);
+        assertEquals(50d,r.minusDi14,1e-8);
+        assertEquals(2d,r.atr14,1e-8);
+        assertEquals(IndicatorEngine.Bias.BEARISH,r.bias);
+    }
+
+    @Test public void runningCandleCannotChangeClosedIndicatorValues() {
+        List<Candle> bars=rising(220);
+        IndicatorEngine engine=new IndicatorEngine();
+        IndicatorEngine.Result before=engine.calculate(snapshot(bars,CandleTimeframe.M1),daily(),NOW);
+        long start=Math.floorDiv(NOW,60000L)*60000L;
+        bars.add(new Candle("XAUUSD",CandleTimeframe.M1,start,319,900,310,899,0,0,true,"fixture",NOW));
+        IndicatorEngine.Result after=engine.calculate(snapshot(bars,CandleTimeframe.M1),daily(),NOW);
+        assertEquals(before.closedBars,after.closedBars);
+        assertEquals(before.rsi14,after.rsi14);
+        assertEquals(before.ema200,after.ema200);
+        assertEquals(before.atr14,after.atr14);
+        assertEquals(before.momentum14,after.momentum14);
+    }
 }
