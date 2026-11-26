@@ -103,4 +103,22 @@ public class EconomicNewsEngineTest {
         assertTrue(e.updateJson(json("2027-01-15T13:15:00","2.6"),"https://calendar.example/api",NOW+86400000L));
         assertTrue(e.evaluateAlerts(NOW+86400000L).isEmpty());
     }
+
+    @Test public void allFiveNewsMilestonesInOneLifecycle(){
+        EconomicNewsEngine e=new EconomicNewsEngine();
+        long release=java.time.Instant.parse("2027-01-15T13:15:00Z").toEpochMilli();
+        int[] minutes={120,45,30,0};
+        EconomicNewsEngine.AlertKind[] kinds={EconomicNewsEngine.AlertKind.MINUTES_120,EconomicNewsEngine.AlertKind.MINUTES_45,EconomicNewsEngine.AlertKind.MINUTES_30,EconomicNewsEngine.AlertKind.RELEASE};
+        for(int i=0;i<minutes.length;i++){
+            long now=release-minutes[i]*60000L;
+            assertTrue(e.updateJson(json("2027-01-15T13:15:00","null"),EconomicCalendarClient.PRIMARY,now));
+            List<EconomicNewsEngine.Alert> alerts=e.evaluateAlerts(now);
+            assertEquals(1,alerts.size());assertEquals(kinds[i],alerts.get(0).kind);
+            assertTrue(e.evaluateAlerts(now).isEmpty());
+        }
+        assertTrue(e.updateJson(json("2027-01-15T13:15:00","2.6"),EconomicCalendarClient.PRIMARY,release+10000L));
+        List<EconomicNewsEngine.Alert> alerts=e.evaluateAlerts(release+10000L);
+        assertEquals(1,alerts.size());assertEquals(EconomicNewsEngine.AlertKind.ACTUAL_AVAILABLE,alerts.get(0).kind);
+        assertTrue(e.evaluateAlerts(release+10000L).isEmpty());
+    }
 }
