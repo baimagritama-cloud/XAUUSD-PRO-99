@@ -27,3 +27,6 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 
 ## 2026-11-27 WIB — Gate 2/3 compact controls
 - HEAD e879caef: Build #115 and UI #46 report success. Source audit found fixed 40/44 physical-pixel heights combined with default Button background insets. Replaced chart/navigation control styling with explicit contrast, ripple, no vertical inset and density-scaled 40dp height. Existing handlers unchanged. Pending build, screenshot review and small-screen validation; not a gate pass.
+
+## Gate 2/3 landscape chart regression
+- Build #116 and UI #47 passed on 284ee8c0, but visual review found insufficient landscape chart space. Compact quote metadata horizontally and combine OHLC details with overlay controls in landscape. Add chart viewport assertion (at least one sixth of display height). Pending CI and visual verification; no gate pass claimed.

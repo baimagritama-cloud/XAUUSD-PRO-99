@@ -144,6 +144,8 @@ public final class SixPageUiTest {
         click(device, "INDICATOR: RSI14");
         assertTrue("Indicator selection did not change", device.wait(Until.hasObject(By.text("INDICATOR: MOM14")), 10000L));
         assertTrue("EMA selection did not change", device.wait(Until.hasObject(By.text("EMA: 10")), 10000L));
+        UiObject2 chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
+        assertTrue("Chart missing or too short", chart!=null && chart.getVisibleBounds().height() >= device.getDisplayHeight()/6);
         click(device, "DETAIL OHLC");
         assertTrue("OHLC detail dialog missing", device.wait(Until.hasObject(By.textContains("OHLC — seluruh timeframe")), 10000L));
         click(device, "TUTUP");

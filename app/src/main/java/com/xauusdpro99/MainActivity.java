@@ -165,8 +165,24 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         pageHost=new LinearLayout(this);pageHost.setOrientation(LinearLayout.VERTICAL);
         root.addView(pageHost,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout livePage=new LinearLayout(this);livePage.setOrientation(LinearLayout.VERTICAL);
-        livePage.addView(price,matchWrap());livePage.addView(bidAsk,matchWrap());
-        livePage.addView(status,matchWrap());livePage.addView(timestamp,matchWrap());livePage.addView(source,matchWrap());
+        boolean landscape=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        if(landscape){
+            LinearLayout quoteRow=new LinearLayout(this);
+            quoteRow.setGravity(Gravity.CENTER_VERTICAL);
+            quoteRow.addView(price,new LinearLayout.LayoutParams(-2,-2));
+            LinearLayout quoteDetails=new LinearLayout(this);quoteDetails.setOrientation(LinearLayout.VERTICAL);
+            quoteDetails.addView(bidAsk,matchWrap());
+            LinearLayout meta=new LinearLayout(this);
+            meta.addView(status,new LinearLayout.LayoutParams(-2,-2));
+            meta.addView(timestamp,new LinearLayout.LayoutParams(0,-2,1));
+            meta.addView(source,new LinearLayout.LayoutParams(-2,-2));
+            quoteDetails.addView(meta,matchWrap());
+            quoteRow.addView(quoteDetails,new LinearLayout.LayoutParams(0,-2,1));
+            livePage.addView(quoteRow,matchWrap());
+        }else{
+            livePage.addView(price,matchWrap());livePage.addView(bidAsk,matchWrap());
+            livePage.addView(status,matchWrap());livePage.addView(timestamp,matchWrap());livePage.addView(source,matchWrap());
+        }
         LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);
         Button refresh=new Button(this);refresh.setText("REFRESH");refresh.setTextSize(11);styleCompactButton(refresh);
         refresh.setOnClickListener(v->{if(engine!=null)engine.refresh();else Toast.makeText(this,"Tick dipantau Foreground Service",Toast.LENGTH_SHORT).show();});
@@ -177,7 +193,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         android.widget.HorizontalScrollView tfScroll=new android.widget.HorizontalScrollView(this);tfScroll.setHorizontalScrollBarEnabled(false);
         for(CandleTimeframe tf:CandleTimeframe.values()){final CandleTimeframe choice=tf;Button t=new Button(this);t.setText(tf.name());t.setTextSize(10);styleCompactButton(t);t.setMinWidth(0);t.setPadding(dp(6),0,dp(6),0);t.setOnClickListener(v->{selectedTimeframe=choice;updateChartFromSnapshots();});tfRow.addView(t,new LinearLayout.LayoutParams(-2,dp(40)));}
         tfScroll.addView(tfRow);livePage.addView(tfScroll,matchWrap());
-        chartView=new LiveCandleChartView(this);livePage.addView(chartView,new LinearLayout.LayoutParams(-1,0,1));
+        chartView=new LiveCandleChartView(this);chartView.setContentDescription("LIVE_CANDLE_CHART");livePage.addView(chartView,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout overlays=new LinearLayout(this);overlays.setOrientation(LinearLayout.HORIZONTAL);
         Button ema=new Button(this);ema.setText("EMA: OFF");ema.setTextSize(10);styleCompactButton(ema);ema.setOnClickListener(v->{String[] opts={"OFF","10","20","50","100","200"};int idx=0;for(int i=0;i<opts.length;i++)if(opts[i].equals(selectedEma))idx=i;selectedEma=opts[(idx+1)%opts.length];chartView.setEma(selectedEma);ema.setText("EMA: "+selectedEma);});
         Button indicator=new Button(this);indicator.setText("INDICATOR: RSI14");indicator.setTextSize(10);styleCompactButton(indicator);indicator.setOnClickListener(v->{String[] opts={"RSI14","MOM14","ADX14","ATR14"};int idx=0;for(int i=0;i<opts.length;i++)if(opts[i].equals(selectedChartIndicator))idx=i;selectedChartIndicator=opts[(idx+1)%opts.length];indicator.setText("INDICATOR: "+selectedChartIndicator);updateChartIndicatorLabel();});
@@ -194,7 +210,8 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             new AlertDialog.Builder(this).setTitle("OHLC — seluruh timeframe")
                 .setView(details).setPositiveButton("TUTUP",null).show();
         });
-        livePage.addView(ohlcDetails,new LinearLayout.LayoutParams(-1,dp(40)));
+        if(landscape) overlays.addView(ohlcDetails,new LinearLayout.LayoutParams(0,dp(40),1));
+        else livePage.addView(ohlcDetails,new LinearLayout.LayoutParams(-1,dp(40)));
         addPage(livePage);
 
         LinearLayout journeyPage=scrollPage();journeyPage.addView(marketJourneySummary,matchWrap());journeyPage.addView(supplySummary,matchWrap());journeyPage.addView(structureSummary,matchWrap());addScrollPage(journeyPage);
