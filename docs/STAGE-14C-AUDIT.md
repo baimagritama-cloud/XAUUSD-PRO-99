@@ -24,3 +24,6 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 - Gates 6/7: signal screenshot shows BUY candidate score 66 with ENGINE WAIT and FREQUENCY BLOCKED, RR below 1.5. Distinguish candidate direction from actionable signal more clearly; no evidence of valid TP1–3 yet.
 - Gate 8: calendar explicitly DATA_UNAVAILABLE, endpoint unconfigured; no fabricated data.
 - Gate 11: #45 passed in-session rotation assertions; no duplicate connection assertion yet. Gate 12: build and existing integration passed, final regression pending. Notification screenshot shows service UNKNOWN before integration starts; not proof of failure or sustained service.
+
+## 2026-11-27 WIB — Gate 2/3 compact controls
+- HEAD e879caef: Build #115 and UI #46 report success. Source audit found fixed 40/44 physical-pixel heights combined with default Button background insets. Replaced chart/navigation control styling with explicit contrast, ripple, no vertical inset and density-scaled 40dp height. Existing handlers unchanged. Pending build, screenshot review and small-screen validation; not a gate pass.

@@ -144,7 +144,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         android.widget.HorizontalScrollView navScroll=new android.widget.HorizontalScrollView(this);
         navScroll.setHorizontalScrollBarEnabled(false);
         String[] pageNames={"LIVE CHART","MARKET JOURNEY","INDICATOR CENTER","SIGNAL CENTER","NEWS","NOTIFICATIONS"};
-        for(int i=0;i<pageNames.length;i++){final int page=i;Button n=new Button(this);n.setText(pageNames[i]);n.setTextSize(10);n.setMinWidth(0);n.setPadding(10,4,10,4);n.setOnClickListener(v->showPage(page));nav.addView(n,new LinearLayout.LayoutParams(-2,44));}
+        for(int i=0;i<pageNames.length;i++){final int page=i;Button n=new Button(this);n.setText(pageNames[i]);n.setTextSize(10);styleCompactButton(n);n.setMinWidth(0);n.setPadding(dp(8),0,dp(8),0);n.setOnClickListener(v->showPage(page));nav.addView(n,new LinearLayout.LayoutParams(-2,dp(40)));}
         navScroll.addView(nav);root.addView(navScroll,matchWrap());
 
         price=text("--",30,0xFFFFFFFF);bidAsk=text("Bid: DATA UNAVAILABLE  •  Ask: DATA UNAVAILABLE  •  Spread: DATA UNAVAILABLE",12,0xFFB8C7D9);
@@ -168,25 +168,25 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         livePage.addView(price,matchWrap());livePage.addView(bidAsk,matchWrap());
         livePage.addView(status,matchWrap());livePage.addView(timestamp,matchWrap());livePage.addView(source,matchWrap());
         LinearLayout actions=new LinearLayout(this);actions.setOrientation(LinearLayout.HORIZONTAL);
-        Button refresh=new Button(this);refresh.setText("REFRESH");refresh.setTextSize(11);
+        Button refresh=new Button(this);refresh.setText("REFRESH");refresh.setTextSize(11);styleCompactButton(refresh);
         refresh.setOnClickListener(v->{if(engine!=null)engine.refresh();else Toast.makeText(this,"Tick dipantau Foreground Service",Toast.LENGTH_SHORT).show();});
-        Button refreshCandles=new Button(this);refreshCandles.setText("REFRESH OHLC");refreshCandles.setTextSize(11);
+        Button refreshCandles=new Button(this);refreshCandles.setText("REFRESH OHLC");refreshCandles.setTextSize(11);styleCompactButton(refreshCandles);
         refreshCandles.setOnClickListener(v->{if(candleEngine!=null)candleEngine.refreshAll();else Toast.makeText(this,"Candle dipantau Foreground Service",Toast.LENGTH_SHORT).show();});
-        actions.addView(refresh,new LinearLayout.LayoutParams(0,44,1));actions.addView(refreshCandles,new LinearLayout.LayoutParams(0,44,1));livePage.addView(actions);
+        actions.addView(refresh,new LinearLayout.LayoutParams(0,dp(40),1));actions.addView(refreshCandles,new LinearLayout.LayoutParams(0,dp(40),1));livePage.addView(actions);
         LinearLayout tfRow=new LinearLayout(this);tfRow.setOrientation(LinearLayout.HORIZONTAL);
         android.widget.HorizontalScrollView tfScroll=new android.widget.HorizontalScrollView(this);tfScroll.setHorizontalScrollBarEnabled(false);
-        for(CandleTimeframe tf:CandleTimeframe.values()){final CandleTimeframe choice=tf;Button t=new Button(this);t.setText(tf.name());t.setTextSize(10);t.setMinWidth(0);t.setPadding(7,2,7,2);t.setOnClickListener(v->{selectedTimeframe=choice;updateChartFromSnapshots();});tfRow.addView(t,new LinearLayout.LayoutParams(-2,40));}
+        for(CandleTimeframe tf:CandleTimeframe.values()){final CandleTimeframe choice=tf;Button t=new Button(this);t.setText(tf.name());t.setTextSize(10);styleCompactButton(t);t.setMinWidth(0);t.setPadding(dp(6),0,dp(6),0);t.setOnClickListener(v->{selectedTimeframe=choice;updateChartFromSnapshots();});tfRow.addView(t,new LinearLayout.LayoutParams(-2,dp(40)));}
         tfScroll.addView(tfRow);livePage.addView(tfScroll,matchWrap());
         chartView=new LiveCandleChartView(this);livePage.addView(chartView,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout overlays=new LinearLayout(this);overlays.setOrientation(LinearLayout.HORIZONTAL);
-        Button ema=new Button(this);ema.setText("EMA: OFF");ema.setTextSize(10);ema.setOnClickListener(v->{String[] opts={"OFF","10","20","50","100","200"};int idx=0;for(int i=0;i<opts.length;i++)if(opts[i].equals(selectedEma))idx=i;selectedEma=opts[(idx+1)%opts.length];chartView.setEma(selectedEma);ema.setText("EMA: "+selectedEma);});
-        Button indicator=new Button(this);indicator.setText("INDICATOR: RSI14");indicator.setTextSize(10);indicator.setOnClickListener(v->{String[] opts={"RSI14","MOM14","ADX14","ATR14"};int idx=0;for(int i=0;i<opts.length;i++)if(opts[i].equals(selectedChartIndicator))idx=i;selectedChartIndicator=opts[(idx+1)%opts.length];indicator.setText("INDICATOR: "+selectedChartIndicator);updateChartIndicatorLabel();});
-        overlays.addView(ema,new LinearLayout.LayoutParams(0,40,1));overlays.addView(indicator,new LinearLayout.LayoutParams(0,40,1));livePage.addView(overlays);
+        Button ema=new Button(this);ema.setText("EMA: OFF");ema.setTextSize(10);styleCompactButton(ema);ema.setOnClickListener(v->{String[] opts={"OFF","10","20","50","100","200"};int idx=0;for(int i=0;i<opts.length;i++)if(opts[i].equals(selectedEma))idx=i;selectedEma=opts[(idx+1)%opts.length];chartView.setEma(selectedEma);ema.setText("EMA: "+selectedEma);});
+        Button indicator=new Button(this);indicator.setText("INDICATOR: RSI14");indicator.setTextSize(10);styleCompactButton(indicator);indicator.setOnClickListener(v->{String[] opts={"RSI14","MOM14","ADX14","ATR14"};int idx=0;for(int i=0;i<opts.length;i++)if(opts[i].equals(selectedChartIndicator))idx=i;selectedChartIndicator=opts[(idx+1)%opts.length];indicator.setText("INDICATOR: "+selectedChartIndicator);updateChartIndicatorLabel();});
+        overlays.addView(ema,new LinearLayout.LayoutParams(0,dp(40),1));overlays.addView(indicator,new LinearLayout.LayoutParams(0,dp(40),1));livePage.addView(overlays);
         chartIndicatorLabel=text("RSI14: DATA UNAVAILABLE",10,0xFFFFD166);livePage.addView(chartIndicatorLabel,matchWrap());
         // Keep the chart weighted; long OHLC diagnostics must never consume its viewport.
         Button ohlcDetails=new Button(this);
         ohlcDetails.setText("DETAIL OHLC");
-        ohlcDetails.setTextSize(10);
+        ohlcDetails.setTextSize(10);styleCompactButton(ohlcDetails);
         ohlcDetails.setOnClickListener(v->{
             ScrollView details=new ScrollView(this);
             TextView content=text(candleSummary.getText().toString(),12,0xFFEAF2FF);
@@ -194,7 +194,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             new AlertDialog.Builder(this).setTitle("OHLC — seluruh timeframe")
                 .setView(details).setPositiveButton("TUTUP",null).show();
         });
-        livePage.addView(ohlcDetails,new LinearLayout.LayoutParams(-1,40));
+        livePage.addView(ohlcDetails,new LinearLayout.LayoutParams(-1,dp(40)));
         addPage(livePage);
 
         LinearLayout journeyPage=scrollPage();journeyPage.addView(marketJourneySummary,matchWrap());journeyPage.addView(supplySummary,matchWrap());journeyPage.addView(structureSummary,matchWrap());addScrollPage(journeyPage);
@@ -256,6 +256,24 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         IndicatorEngine.Result r=new IndicatorEngine().calculate(snap,latestSnapshots.get(CandleTimeframe.D1),System.currentTimeMillis());
         Double v="MOM14".equals(selectedChartIndicator)?r.momentum14:"ADX14".equals(selectedChartIndicator)?r.adx14:"ATR14".equals(selectedChartIndicator)?r.atr14:r.rsi14;
         chartIndicatorLabel.setText(selectedChartIndicator+" • "+fmt(v)+" • "+r.validity+" • "+snap.sourceStatus);
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void styleCompactButton(Button button) {
+        android.graphics.drawable.GradientDrawable background = new android.graphics.drawable.GradientDrawable();
+        background.setColor(0xFF24364B);
+        background.setCornerRadius(dp(4));
+        background.setStroke(dp(1), 0xFF52677E);
+        button.setBackground(new android.graphics.drawable.RippleDrawable(
+            android.content.res.ColorStateList.valueOf(0x3355AAFF), background, null));
+        button.setTextColor(0xFFEAF2FF);
+        button.setGravity(Gravity.CENTER);
+        button.setMinHeight(0);
+        button.setMinimumHeight(0);
+        button.setPadding(dp(4), 0, dp(4), 0);
     }
 
     private TextView text(String value, int size, int color) {
