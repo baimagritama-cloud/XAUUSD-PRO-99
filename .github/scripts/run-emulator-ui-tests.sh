@@ -156,8 +156,7 @@ run_orchestrated() {
   grep -Eq 'OK \(1 test\)|Tests found: 1,[[:space:]]*Tests run: 1,[[:space:]]*Failures: 0' "$output"
 }
 
-# Stage 1: run only the six-page landscape UI test. The portrait method remains
-# in source but is @Ignore during this stabilization phase.
+# Stage 1: independently test both orientations.
 echo "STAGE 1/2: six-page landscape UI test"
 start_live_evidence_capture stage1
 run_orchestrated stage1 allSixPagesRenderInLandscape
@@ -176,6 +175,16 @@ if [[ "$count" -ne 6 ]]; then
   echo "ERROR: Stage 1 screenshot count mismatch!"
   exit 1
 fi
+echo "STAGE 1B: six-page portrait UI test"
+start_live_evidence_capture stage1-portrait
+run_orchestrated stage1-portrait allSixPagesRenderInPortrait
+stop_live_evidence_capture
+export_instrumentation_evidence
+for orientation in landscape portrait; do
+  for page in live_chart market_journey indicator_center signal_center news notifications; do
+    test -s "artifacts/ui-screenshots/instrumentation/ui-screenshots/${orientation}_${page}.png"
+  done
+done
 # Preserve Stage 1's reports and logcat before Stage 2 can replace Gradle outputs.
 mkdir -p artifacts/diagnostics/stage1-test-results artifacts/diagnostics/stage1-test-reports
 if [[ -d app/build/outputs/androidTest-results/connected ]]; then
@@ -187,7 +196,7 @@ fi
 adb logcat -b all -d -v threadtime > artifacts/diagnostics/stage1-logcat.txt 2>&1
 adb logcat -c
 
-echo "STAGE 1 PASSED: all six landscape page screenshots captured."
+echo "STAGE 1 PASSED: all twelve landscape and portrait page screenshots captured."
 
 # Stage 2: independently verify the production Foreground Service and SignalR
 # lifecycle while the app task is backgrounded. No feature is disabled or mocked.

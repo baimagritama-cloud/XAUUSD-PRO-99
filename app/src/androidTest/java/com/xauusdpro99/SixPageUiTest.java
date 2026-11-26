@@ -14,7 +14,6 @@ import androidx.test.uiautomator.Until;
 
 import com.xauusdpro99.monitoring.MarketMonitoringService;
 
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -28,9 +27,6 @@ public final class SixPageUiTest {
         "SIGNAL CENTER", "NEWS", "NOTIFICATIONS"
     };
 
-    // Temporary CI stabilization phase: keep portrait support and its test source,
-    // but do not execute portrait instrumentation until landscape is stable.
-    @Ignore("Temporarily landscape-only CI phase; restore portrait test after emulator stabilization")
     @Test
     public void allSixPagesRenderInPortrait() throws Exception {
         UiDevice device = device();
@@ -147,7 +143,7 @@ public final class SixPageUiTest {
         for (String page : PAGES) {
             UiObject2 nav = waitForText(device, page, 10_000L);
             if (nav == null) {
-                int y = Math.max(80, device.getDisplayHeight() / 12);
+                int y = Math.max(20, device.getDisplayHeight() / 12);
                 device.swipe(device.getDisplayWidth() - 40, y, 40, y, 25);
                 device.waitForIdle();
                 nav = waitForText(device, page, 3_000L);
@@ -215,6 +211,11 @@ public final class SixPageUiTest {
                 orientation + "_" + page.toLowerCase().replace(' ', '_') + ".png");
             assertTrue("Missing or empty screenshot: " + screenshot,
                 screenshot.isFile() && screenshot.length() > 0);
+            android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            android.graphics.BitmapFactory.decodeFile(screenshot.getAbsolutePath(), bounds);
+            assertTrue("Incorrect screenshot orientation: " + screenshot,
+                orientation.equals("portrait") ? bounds.outHeight > bounds.outWidth : bounds.outWidth > bounds.outHeight);
         }
     }
 
