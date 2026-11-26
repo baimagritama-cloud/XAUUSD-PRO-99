@@ -17,10 +17,14 @@ public final class EconomicCalendarClient {
     public static final String FALLBACK = "https://xoomar.com/api/markets/calendar?importance=high";
     private EconomicCalendarClient(){}
     public static boolean refresh(EconomicNewsEngine engine,String endpoint,String apiKey) throws Exception {
+        return refresh(engine,endpoint,apiKey,EconomicCalendarClient::fetch);
+    }
+    interface Transport { Response fetch(String endpoint,String apiKey) throws Exception; }
+    static boolean refresh(EconomicNewsEngine engine,String endpoint,String apiKey,Transport transport) throws Exception {
         String primary=endpoint==null||endpoint.trim().isEmpty()?PRIMARY:endpoint;
         Exception failure=null;
         for(String url: primary.equals(PRIMARY)?new String[]{PRIMARY,FALLBACK}:new String[]{primary}) {
-            try { Response response=fetch(url,apiKey); if(engine.updateJson(response.body,response.source,response.receivedAtMs)) return true; }
+            try { Response response=transport.fetch(url,apiKey); if(engine.updateJson(response.body,response.source,response.receivedAtMs)) return true; }
             catch(Exception ex){failure=ex;}
         }
         if(failure!=null) throw failure;
