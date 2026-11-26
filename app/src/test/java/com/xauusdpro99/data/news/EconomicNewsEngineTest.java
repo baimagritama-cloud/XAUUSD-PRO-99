@@ -31,6 +31,7 @@ public class EconomicNewsEngineTest {
         assertTrue(e.updateJson(json("2027-01-15T13:15:00","null"),"https://calendar.example/api",NOW));
         assertTrue(e.evaluateAlerts(NOW).isEmpty());
         long release=java.time.Instant.parse("2027-01-15T13:15:00Z").toEpochMilli();
+        assertTrue(e.updateJson(json("2027-01-15T13:15:00","null"),"https://calendar.example/api",release-45*60_000L));
         List<EconomicNewsEngine.Alert> a=e.evaluateAlerts(release-45*60_000L);
         assertEquals(1,a.size());assertEquals(EconomicNewsEngine.AlertKind.MINUTES_45,a.get(0).kind);
         assertTrue(e.evaluateAlerts(release-45*60_000L).isEmpty());
@@ -41,6 +42,7 @@ public class EconomicNewsEngineTest {
         String scheduled=json("2027-01-15T13:15:00","null");
         assertTrue(e.updateJson(scheduled,"https://calendar.example/api",NOW));
         long release=java.time.Instant.parse("2027-01-15T13:15:00Z").toEpochMilli();
+        assertTrue(e.updateJson(scheduled,"https://calendar.example/api",release));
         List<EconomicNewsEngine.Alert> atRelease=e.evaluateAlerts(release);
         assertEquals(1,atRelease.size());
         assertEquals(EconomicNewsEngine.AlertKind.RELEASE,atRelease.get(0).kind);
@@ -55,5 +57,13 @@ public class EconomicNewsEngineTest {
         e.markStale(NOW+31*60_000L);
         assertEquals(EconomicNewsEngine.DataStatus.STALE,e.getDataStatus());
         assertTrue(e.evaluateAlerts(NOW+31*60_000L).isEmpty());
+    }
+
+    @Test public void alertEvaluationAutomaticallyRejectsExpiredCalendar(){
+        EconomicNewsEngine e=new EconomicNewsEngine();
+        long release=java.time.Instant.parse("2027-01-15T13:15:00Z").toEpochMilli();
+        assertTrue(e.updateJson(json("2027-01-15T13:15:00","null"),"https://calendar.example/api",release-80*60_000L));
+        assertTrue(e.evaluateAlerts(release-45*60_000L).isEmpty());
+        assertEquals(EconomicNewsEngine.DataStatus.STALE,e.getDataStatus());
     }
 }

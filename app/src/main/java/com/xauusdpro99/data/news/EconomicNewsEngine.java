@@ -141,6 +141,7 @@ public final class EconomicNewsEngine {
     /** Emits each 45/30-minute alert once in a 60-second window; release/actual alerts are deduplicated. */
     public synchronized List<Alert> evaluateAlerts(long nowMs) {
         List<Alert> out=new ArrayList<>();
+        markStale(nowMs);
         if(dataStatus!=DataStatus.LIVE) return out;
         for(Event e:events) {
             if(e.status==EventStatus.CANCELLED) continue;
@@ -164,18 +165,26 @@ public final class EconomicNewsEngine {
         if(event==null || m1==null || m1.sourceStatus!=CandleEngine.SourceStatus.LIVE
                 || m1.closed==null || m1.closed.size()<4)
             return Reaction.unavailable("M1 live belum cukup");
+        if(m1.timeframe!=com.xauusdpro99.data.candle.CandleTimeframe.M1)
+            return Reaction.unavailable("Timeframe reaksi harus M1");
         Candle before=null, first=null, later=null;
+        int reactionBars=0;
         double hi=Double.NEGATIVE_INFINITY,lo=Double.POSITIVE_INFINITY;
         for(Candle c:m1.closed) {
             if(c.closeTimeMs()<=event.releaseAtMs) before=c;
             if(c.openTimeMs>=event.releaseAtMs && first==null) first=c;
             if(first!=null && c.openTimeMs>=first.openTimeMs
                     && c.openTimeMs<=first.openTimeMs+2*m1.timeframe.durationMs) {
+                if(c.openTimeMs!=first.openTimeMs+reactionBars*m1.timeframe.durationMs || c.isOpen)
+                    return Reaction.unavailable("Candle reaksi tidak berurutan atau belum tertutup");
+                reactionBars++;
                 hi=Math.max(hi,c.high); lo=Math.min(lo,c.low);
                 if(c.openTimeMs>=first.openTimeMs+2*m1.timeframe.durationMs) later=c;
             }
         }
-        if(before==null || first==null || later==null)
+        if(before==null || first==null || later==null || reactionBars!=3
+                || first.openTimeMs-event.releaseAtMs>=m1.timeframe.durationMs
+                || event.releaseAtMs-before.closeTimeMs()>=m1.timeframe.durationMs)
             return Reaction.unavailable("Belum tersedia candle sebelum dan tiga candle sesudah rilis");
         double change=first.close-before.close;
         String direction=change>0?"NAIK":change<0?"TURUN":"DATAR";
