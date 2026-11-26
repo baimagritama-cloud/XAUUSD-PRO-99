@@ -1,0 +1,55 @@
+name: Calendar Provider Probe
+on:
+  push:
+    paths:
+      - '.github/workflows/calendar-provider-probe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe public calendar endpoints
+        shell: bash
+        run: |
+          mkdir -p evidence
+          probe() {
+            local name="$1" url="$2"
+            curl --proto '=https' --connect-timeout 15 --max-time 45 -sS -D "evidence/$name.headers" -o "evidence/$name.json" -w 'HTTP %{http_code} DNS %{time_namelookup} TLS %{time_appconnect} total %{time_total}\n' "$url" > "evidence/$name.transport" 2>&1
+            local rc=$?
+            echo "curl exit=$rc" >> "evidence/$name.transport"
+            cat "evidence/$name.transport"
+            if [ "$rc" -eq 0 ]; then
+              python3 -m json.tool "evidence/$name.json" > "evidence/$name.pretty.json" || echo "Invalid JSON: $name"
+            fi
+          }
+          set +e
+          probe showmytrades 'https://showmytrades.com/api/public/calendar/v1?currency=USD&impact=all&days=7'
+          probe xoomar 'https://xoomar.com/api/markets/calendar?importance=high'
+          python3 - <<'PY'
+          import json, pathlib
+          for p in pathlib.Path('evidence').glob('*.pretty.json'):
+              try:
+                  obj=json.loads(p.read_text())
+                  print(p.name, 'root:', type(obj).__name__)
+                  def inspect(o):
+                      if isinstance(o,list):
+                          print('array length:',len(o))
+                          if o and isinstance(o[0],dict):
+                              keys=sorted(set().union(*(x.keys() for x in o if isinstance(x,dict))))
+                              print('field nonempty counts:',{k:sum(isinstance(x,dict) and x.get(k) not in (None,'','N/A','--') for x in o) for k in keys})
+                      elif isinstance(o,dict):
+                          print('root keys:',list(o))
+                          for k,v in o.items():
+                              if isinstance(v,(list,dict)): inspect(v)
+                  inspect(obj)
+              except Exception as e: print(type(e).__name__,str(e))
+          PY
+      - name: Upload probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: calendar-provider-probe
+          path: evidence/
