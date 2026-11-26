@@ -130,6 +130,10 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         notificationPrefs = getSharedPreferences("notification_settings", MODE_PRIVATE);
         newsPrefs = getSharedPreferences("economic_news_settings", MODE_PRIVATE);
         calendarEndpoint = newsPrefs.getString("calendar_endpoint", EconomicCalendarClient.PRIMARY);
+        if(calendarEndpoint.trim().isEmpty()) {
+            calendarEndpoint=EconomicCalendarClient.PRIMARY;
+            newsPrefs.edit().putString("calendar_endpoint",calendarEndpoint).apply();
+        }
         loadNotificationSettings();
         voiceEngine = new VoiceEngine(this, message -> runOnUiThread(() -> { if (voiceStatus != null) voiceStatus.setText("VOICE: " + message); }));
         LinearLayout root = new LinearLayout(this);
@@ -670,16 +674,17 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     private void configureCalendarEndpoint() {
         LinearLayout form=new LinearLayout(this);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(24,8,24,8);
         EditText endpoint=new EditText(this);endpoint.setSingleLine(true);
-        endpoint.setHint("https://api.tradingeconomics.com/calendar/country/united%20states?f=json");
+        endpoint.setHint(EconomicCalendarClient.PRIMARY);
         endpoint.setText(calendarEndpoint);
         EditText apiKey=new EditText(this);apiKey.setSingleLine(true);apiKey.setInputType(129);
         apiKey.setHint(CalendarCredentialStore.load(this).isEmpty()?"API key Trading Economics":"API key tersimpan terenkripsi — isi hanya jika ingin mengganti");
         form.addView(text("ENDPOINT HTTPS (tanpa parameter c=)",12,0xFFFFFFFF));form.addView(endpoint);
         form.addView(text("API KEY — disimpan terenkripsi Android Keystore",12,0xFFFFFFFF));form.addView(apiKey);
         new AlertDialog.Builder(this).setTitle("Sumber kalender ekonomi")
-            .setMessage("Sumber yang disarankan: Trading Economics Calendar API. Perlu langganan/API key provider. Jangan tempel key ke URL; aplikasi mengirimnya melalui header Authorization.")
+            .setMessage("Sumber bawaan: ShowMyTrades, cadangan XOOMAR, tanpa API key. Endpoint khusus tetap didukung; jangan tempel key ke URL. Kosongkan endpoint untuk kembali ke sumber bawaan.")
             .setView(form).setPositiveButton("SIMPAN",(d,w)->{
                 calendarEndpoint=endpoint.getText().toString().trim();
+                if(calendarEndpoint.isEmpty())calendarEndpoint=EconomicCalendarClient.PRIMARY;
                 newsPrefs.edit().putString("calendar_endpoint",calendarEndpoint).apply();
                 try {String key=apiKey.getText().toString().trim();if(!key.isEmpty())CalendarCredentialStore.save(this,key);
                     if(calendarEndpoint.isEmpty())economicNewsEngine.markUnavailable("endpoint belum dikonfigurasi",System.currentTimeMillis());
