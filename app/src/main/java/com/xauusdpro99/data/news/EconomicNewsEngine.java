@@ -41,7 +41,7 @@ public final class EconomicNewsEngine {
     public static final class Alert {
         public final Event event; public final AlertKind kind;
         Alert(Event event, AlertKind kind) { this.event=event; this.kind=kind; }
-        public String key() { return event.id + ":" + kind.name(); }
+        public String key() { return event.name.toLowerCase(Locale.US).replaceAll("[^a-z0-9]","") + ":" + event.releaseAtMs + ":" + kind.name(); }
         public String title() { return event.name + " — " + kind.name(); }
     }
     public static final class Reaction {
@@ -160,7 +160,7 @@ public final class EconomicNewsEngine {
                 add(out,e,AlertKind.MINUTES_30);
             if(Math.abs(e.releaseAtMs-nowMs)<=30_000L)
                 add(out,e,AlertKind.RELEASE);
-            if(e.actual!=null && !e.actual.trim().isEmpty() && e.releaseAtMs<=nowMs+60_000L)
+            if(e.actual!=null && !e.actual.trim().isEmpty() && e.releaseAtMs<=nowMs && nowMs-e.releaseAtMs<=60*60_000L)
                 add(out,e,AlertKind.ACTUAL_AVAILABLE);
         }
         return out;
