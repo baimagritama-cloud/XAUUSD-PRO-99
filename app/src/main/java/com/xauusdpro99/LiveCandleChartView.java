@@ -53,7 +53,7 @@ public final class LiveCandleChartView extends View {
         for(Zone z:zones){float y1=map(z.upper,min,max,top,bottom),y2=map(z.lower,min,max,top,bottom);p.setColor(z.demand?0x3320A8FF:0x33FF5268);c.drawRect(left,Math.min(y1,y2),right,Math.max(y1,y2),p);p.setColor(z.demand?0xFF55B8FF:0xFFFF7888);p.setTextSize(9);c.drawText(z.label,left+4,Math.min(y1,y2)+11,p);}
         if(Double.isFinite(resistance))level(c,left,right,map(resistance,min,max,top,bottom),0xFFFF6677,"R "+String.format(Locale.US,"%.2f",resistance));
         if(Double.isFinite(support))level(c,left,right,map(support,min,max,top,bottom),0xFF55B8FF,"S "+String.format(Locale.US,"%.2f",support));
-        float step=plotW/Math.max(1,(end-start));float body=Math.max(1.4f,Math.min(8f,step*.62f));
+        float step=plotW/Math.max(1,(end-start));float body=Math.max(0.5f,Math.min(8f,step*.62f));
         for(int i=start;i<end;i++){Candle b=candles.get(i);float x=left+(i-start+.5f)*step;float yh=map(b.high,min,max,top,bottom),yl=map(b.low,min,max,top,bottom),yo=map(b.open,min,max,top,bottom),yc=map(b.close,min,max,top,bottom);int color=b.close>=b.open?up:down;p.setColor(color);p.setStrokeWidth(1.2f);c.drawLine(x,yh,x,yl,p);p.setStyle(Paint.Style.FILL);c.drawRect(x-body/2,Math.min(yo,yc),x+body/2,Math.max(Math.max(yo,yc),Math.min(yo,yc)+1),p);}
         drawEma(c,start,end,left,step,min,max,top,bottom);
         p.setColor(0xFF718096);p.setTextSize(9);c.drawText("300 bar window",left,bottom+17,p);
@@ -64,7 +64,7 @@ public final class LiveCandleChartView extends View {
         for(int i=0;i<end;i++){double close=candles.get(i).close;value=Double.isNaN(value)?close:close*alpha+value*(1-alpha);if(i>=start){float x=left+(i-start+.5f)*step,y=map(value,min,max,top,bottom);if(!begun){path.moveTo(x,y);begun=true;}else path.lineTo(x,y);}}
         p.setColor(0xFFFFD166);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);c.drawPath(path,p);p.setStyle(Paint.Style.FILL);
     }
-    private void level(Canvas c,float l,float r,float y,int color,String label){p.setColor(color);p.setStrokeWidth(1.2f);p.setStyle(Paint.Style.STROKE);c.drawLine(l,y,r,y,p);p.setStyle(Paint.Style.FILL);p.setTextSize(9);c.drawText(label,l+4,y-3,p);}
+    private void level(Canvas c,float l,float r,float y,int color,String label){p.setColor(color);p.setStrokeWidth(1.2f);p.setStyle(Paint.Style.STROKE);c.drawLine(l,y,r,y,p);p.setStyle(Paint.Style.FILL);p.setTextSize(9);c.drawText(label,r+3,y-3,p);}
     private float map(double v,double min,double max,float top,float bottom){return bottom-(float)((v-min)/(max-min))*(bottom-top);}
     @Override public boolean onTouchEvent(MotionEvent e){if(e.getAction()==MotionEvent.ACTION_DOWN){lastX=e.getX();return true;}if(e.getAction()==MotionEvent.ACTION_MOVE){float dx=e.getX()-lastX;lastX=e.getX();if(Math.abs(dx)>2&&!candles.isEmpty()){panBars=Math.max(0,Math.min(candles.size()-1,panBars+Math.round(dx/Math.max(2,(getWidth()-80)/300f))));invalidate();}return true;}return e.getAction()==MotionEvent.ACTION_UP||e.getAction()==MotionEvent.ACTION_CANCEL;}
 }

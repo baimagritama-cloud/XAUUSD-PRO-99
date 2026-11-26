@@ -183,7 +183,18 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         Button indicator=new Button(this);indicator.setText("INDICATOR: RSI14");indicator.setTextSize(10);indicator.setOnClickListener(v->{String[] opts={"RSI14","MOM14","ADX14","ATR14"};int idx=0;for(int i=0;i<opts.length;i++)if(opts[i].equals(selectedChartIndicator))idx=i;selectedChartIndicator=opts[(idx+1)%opts.length];indicator.setText("INDICATOR: "+selectedChartIndicator);updateChartIndicatorLabel();});
         overlays.addView(ema,new LinearLayout.LayoutParams(0,40,1));overlays.addView(indicator,new LinearLayout.LayoutParams(0,40,1));livePage.addView(overlays);
         chartIndicatorLabel=text("RSI14: DATA UNAVAILABLE",10,0xFFFFD166);livePage.addView(chartIndicatorLabel,matchWrap());
-        livePage.addView(candleSummary,matchWrap());
+        // Keep the chart weighted; long OHLC diagnostics must never consume its viewport.
+        Button ohlcDetails=new Button(this);
+        ohlcDetails.setText("DETAIL OHLC");
+        ohlcDetails.setTextSize(10);
+        ohlcDetails.setOnClickListener(v->{
+            ScrollView details=new ScrollView(this);
+            TextView content=text(candleSummary.getText().toString(),12,0xFFEAF2FF);
+            details.addView(content);
+            new AlertDialog.Builder(this).setTitle("OHLC — seluruh timeframe")
+                .setView(details).setPositiveButton("TUTUP",null).show();
+        });
+        livePage.addView(ohlcDetails,new LinearLayout.LayoutParams(-1,40));
         addPage(livePage);
 
         LinearLayout journeyPage=scrollPage();journeyPage.addView(marketJourneySummary,matchWrap());journeyPage.addView(supplySummary,matchWrap());journeyPage.addView(structureSummary,matchWrap());addScrollPage(journeyPage);
