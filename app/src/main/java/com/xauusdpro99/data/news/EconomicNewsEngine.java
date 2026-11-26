@@ -80,16 +80,17 @@ public final class EconomicNewsEngine {
                     :(root.isJsonObject() && root.getAsJsonObject().has("data")
                     && root.getAsJsonObject().get("data").isJsonArray()
                     ?root.getAsJsonObject().getAsJsonArray("data"):null);
+            if(array==null && root.isJsonObject() && root.getAsJsonObject().has("events") && root.getAsJsonObject().get("events").isJsonArray()) array=root.getAsJsonObject().getAsJsonArray("events");
             if(array==null) throw new IllegalArgumentException("Format JSON bukan array kalender");
             List<Event> parsed=new ArrayList<>();
             String host=sourceUrl;
             for(JsonElement el:array){
                 if(!el.isJsonObject()) continue;
                 JsonObject o=el.getAsJsonObject();
-                String country=str(o,"Country","country");
-                String name=str(o,"Event","event","Name","name","Category","category");
+                String country=str(o,"Country","country","currency");
+                String name=str(o,"Event","event","Name","name","Category","category","title","eventName");
                 if(name==null || !isUsdCountry(country) || !isRelevant(name)) continue;
-                Long time=parseTime(str(o,"Date","date","datetime","Time","time"));
+                Long time=parseTime(str(o,"ts","scheduledAt","Date","date","datetime","Time","time"));
                 if(time==null) continue;
                 String id=first(str(o,"CalendarId","CalendarID","calendarId","id","Ticker","ticker"),
                         country+"|"+name+"|"+time);
@@ -198,7 +199,7 @@ public final class EconomicNewsEngine {
     }
 
     private static boolean isHttps(String u){return u!=null&&u.trim().toLowerCase(Locale.US).startsWith("https://");}
-    private static boolean isUsdCountry(String c){return c!=null&&(c.equalsIgnoreCase("US")||c.equalsIgnoreCase("USA")||c.toLowerCase(Locale.US).contains("united states"));}
+    private static boolean isUsdCountry(String c){return c!=null&&(c.equalsIgnoreCase("USD")||c.equalsIgnoreCase("US")||c.equalsIgnoreCase("USA")||c.toLowerCase(Locale.US).contains("united states"));}
     private static boolean isRelevant(String n){
         String s=n.toLowerCase(Locale.US);
         String[] keys={"fomc","federal funds","interest rate","powell","cpi","consumer price","pce","personal consumption","nonfarm","non-farm","unemployment","average hourly earnings","employment situation","gross domestic product","gdp","ism manufacturing","ism services","retail sales","initial jobless","jobless claims","durable goods","producer price","ppi","consumer confidence","jolts"};
@@ -213,6 +214,8 @@ public final class EconomicNewsEngine {
     private static String first(String a,String b){return a==null||a.trim().isEmpty()?b:a;}
     private static Long parseTime(String s){
         if(s==null||s.trim().isEmpty())return null;
+        try { if(s.matches("[0-9]{10}")) return Long.parseLong(s)*1000L; if(s.matches("[0-9]{13}")) return Long.parseLong(s); } catch(NumberFormatException ignored){} 
+        try{return java.time.OffsetDateTime.parse(s).toInstant().toEpochMilli();}catch(Exception ignored){}
         try{return java.time.Instant.parse(s).toEpochMilli();}catch(Exception ignored){}
         String[] patterns={"yyyy-MM-dd'T'HH:mm:ss","yyyy-MM-dd HH:mm:ss","yyyy-MM-dd"};
         for(String p:patterns)try{SimpleDateFormat f=new SimpleDateFormat(p,Locale.US);f.setLenient(false);f.setTimeZone(TimeZone.getTimeZone("UTC"));Date d=f.parse(s);if(d!=null)return d.getTime();}catch(ParseException ignored){}
