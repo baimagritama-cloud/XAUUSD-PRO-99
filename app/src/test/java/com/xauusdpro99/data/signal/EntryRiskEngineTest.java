@@ -23,4 +23,27 @@ public class EntryRiskEngineTest {
    assertTrue(Double.isNaN(result.atr));
   }
  }
+
+ @Test public void technicalTargetsAreOrderedDistinctAndMeetMinimumRR(){
+  for(SignalScoringEngine.Direction d:SignalScoringEngine.Direction.values()){
+   double sign=d==SignalScoringEngine.Direction.BUY?1:-1;
+   List<EntryRiskEngine.Level> levels=new ArrayList<>();
+   for(double distance:new double[]{8,1,3,3.01,5,10})
+    levels.add(new EntryRiskEngine.Level(2000+sign*distance,"M5","fixture swing"));
+   List<EntryRiskEngine.Target> targets=EntryRiskEngine.selectTargets(levels,d,2000,2,.2);
+   assertEquals(3,targets.size());
+   double[] expected={3,5,8};
+   for(int i=0;i<3;i++){
+    assertEquals("TP"+(i+1),targets.get(i).label);
+    assertEquals(2000+sign*expected[i],targets.get(i).price,1e-8);
+    assertEquals(expected[i]/2,targets.get(i).rr,1e-8);
+   }
+  }
+ }
+ @Test public void insufficientTechnicalTargetsAreNotInvented(){
+  List<EntryRiskEngine.Level> levels=Arrays.asList(new EntryRiskEngine.Level(2001,"M5","fixture"),new EntryRiskEngine.Level(2003,"M5","fixture"));
+  List<EntryRiskEngine.Target> targets=EntryRiskEngine.selectTargets(levels,SignalScoringEngine.Direction.BUY,2000,2,.2);
+  assertEquals(1,targets.size());
+  assertEquals(1.5,targets.get(0).rr,1e-8);
+ }
 }

@@ -41,7 +41,7 @@ public final class EntryRiskEngine {
    accepted=Collections.unmodifiableList(a);rejected=Collections.unmodifiableList(r);
   }
  }
- private static final class Level {double price;String tf,source;Level(double p,String t,String s){price=p;tf=t;source=s;}}
+ static final class Level {double price;String tf,source;Level(double p,String t,String s){price=p;tf=t;source=s;}}
  public Result calculate(Input x){
   List<String> ok=new ArrayList<>(),bad=new ArrayList<>();List<Target> tps=new ArrayList<>();
   if(x==null||x.scored==null)return result(false,null,"N/A","N/A",Double.NaN,Double.NaN,Double.NaN,Double.NaN,Double.NaN,Double.NaN,Double.NaN,tps,ok,Collections.singletonList("Input tidak tersedia"));
@@ -157,9 +157,13 @@ public final class EntryRiskEngine {
    MarketStructureEngine.Swing sw=d==SignalScoringEngine.Direction.BUY?it.getValue().lastSwingHigh:it.getValue().lastSwingLow;
    if(sw!=null&&(d==SignalScoringEngine.Direction.BUY?sw.price>e:sw.price<e))ls.add(new Level(sw.price,it.getKey().name(),"CONFIRMED SWING "+sw.label));
   }
+  return selectTargets(ls,d,e,risk,x.spread);
+ }
+ static List<Target> selectTargets(List<Level> ls,SignalScoringEngine.Direction d,double e,double risk,double spread){
+  ls=new ArrayList<>(ls);
   ls.sort((a,b)->d==SignalScoringEngine.Direction.BUY?Double.compare(a.price,b.price):Double.compare(b.price,a.price));
   List<Target> out=new ArrayList<>();double last=Double.NaN;
-  for(Level l:ls){if(Double.isFinite(last)&&Math.abs(last-l.price)<=Math.max(x.spread*.5,.01))continue;double rr=Math.abs(l.price-e)/risk;
+  for(Level l:ls){if(Double.isFinite(last)&&Math.abs(last-l.price)<=Math.max(spread*.5,.01))continue;double rr=Math.abs(l.price-e)/risk;
    if(rr<MIN_RR)continue;out.add(new Target("TP"+(out.size()+1),l.tf,l.source,l.price,rr));last=l.price;if(out.size()==3)break;}
   return out;
  }
