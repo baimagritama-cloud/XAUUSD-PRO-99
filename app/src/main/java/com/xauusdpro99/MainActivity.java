@@ -129,7 +129,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         notificationCenter = new NotificationCenter(this);
         notificationPrefs = getSharedPreferences("notification_settings", MODE_PRIVATE);
         newsPrefs = getSharedPreferences("economic_news_settings", MODE_PRIVATE);
-        calendarEndpoint = newsPrefs.getString("calendar_endpoint", "");
+        calendarEndpoint = newsPrefs.getString("calendar_endpoint", EconomicCalendarClient.PRIMARY);
         loadNotificationSettings();
         voiceEngine = new VoiceEngine(this, message -> runOnUiThread(() -> { if (voiceStatus != null) voiceStatus.setText("VOICE: " + message); }));
         LinearLayout root = new LinearLayout(this);
@@ -699,9 +699,8 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         lastCalendarFetchAtMs=System.currentTimeMillis();
         newsExecutor.execute(()->{
             try {
-                EconomicCalendarClient.Response response=EconomicCalendarClient.fetch(endpoint,CalendarCredentialStore.load(this));
-                lastCalendarFetchAtMs=response.receivedAtMs;
-                boolean ok=economicNewsEngine.updateJson(response.body,response.source,response.receivedAtMs);
+                boolean ok=EconomicCalendarClient.refresh(economicNewsEngine,endpoint,CalendarCredentialStore.load(this));
+                lastCalendarFetchAtMs=System.currentTimeMillis();
                 runOnUiThread(()->{
                     renderEconomicNews(latestSnapshots);
                     Toast.makeText(this,ok?"Kalender ekonomi diperbarui":"Kalender ditolak: "+economicNewsEngine.getDetail(),Toast.LENGTH_LONG).show();
