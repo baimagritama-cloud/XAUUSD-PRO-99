@@ -49,7 +49,7 @@ collect_diagnostics() {
 
   {
     echo "=== instrumentation runner private cache ==="
-    adb shell run-as com.xauusdpro99.test ls -lR cache/ui-screenshots 2>&1
+    adb shell run-as com.xauusdpro99 ls -lR cache/ui-screenshots 2>&1
     echo "=== instrumentation runner external files (diagnostic only) ==="
     adb shell ls -lR /sdcard/Android/data/com.xauusdpro99.test/files/ui-screenshots 2>&1
   } > artifacts/diagnostics/device-screenshot-files.txt
@@ -66,12 +66,12 @@ collect_diagnostics() {
 # relying on ExternalFilesDir, which can be null on headless emulator images.
 export_instrumentation_evidence() {
   mkdir -p artifacts/ui-screenshots/instrumentation
-  if adb shell run-as com.xauusdpro99.test test -d cache/ui-screenshots; then
-    adb exec-out run-as com.xauusdpro99.test tar -C cache -cf - ui-screenshots \
+  if adb shell run-as com.xauusdpro99 test -d cache/ui-screenshots; then
+    adb exec-out run-as com.xauusdpro99 tar -C cache -cf - ui-screenshots \
       | tar -xf - -C artifacts/ui-screenshots/instrumentation
   else
     echo "Instrumentation screenshot cache not found; listing runner cache:"
-    adb shell run-as com.xauusdpro99.test ls -la cache || true
+    adb shell run-as com.xauusdpro99 ls -la cache || true
     return 1
   fi
 }
@@ -128,9 +128,8 @@ timeout 30 adb logcat -b all -d -v threadtime > artifacts/diagnostics/pre-stage1
 wait_for_stable_framework stage1
 
 # Install once and retain packages until evidence has been collected.
-gradle --no-daemon :app:dependencies --configuration androidTestUtil > artifacts/diagnostics/test-util-dependencies.txt
-orchestrator=$(find "$HOME/.gradle/caches/modules-2/files-2.1/androidx.test/orchestrator/1.6.1" -name '*.apk' -print -quit)
-services=$(find "$HOME/.gradle/caches/modules-2/files-2.1/androidx.test.services/test-services" -name '*.apk' -print -quit)
+orchestrator=app/build/ci-test-apks/orchestrator-1.6.1.apk
+services=app/build/ci-test-apks/test-services-1.6.0.apk
 test -f "$orchestrator"
 test -f "$services"
 timeout 180 adb install -r -t "$services"
@@ -154,7 +153,7 @@ run_orchestrated() {
   if grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|shortMsg=|INSTRUMENTATION_STATUS_CODE: -[12]' "$output"; then
     return 1
   fi
-  grep -Eq 'OK \(1 test\)|Tests found: 1, Tests run: 1,  Failures: 0' "$output"
+  grep -Eq 'OK \(1 test\)|Tests found: 1,[[:space:]]*Tests run: 1,[[:space:]]*Failures: 0' "$output"
 }
 
 # Stage 1: run only the six-page landscape UI test. The portrait method remains

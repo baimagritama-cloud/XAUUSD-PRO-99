@@ -98,7 +98,7 @@ public final class SixPageUiTest {
         // Use the instrumentation package's private cache. ExternalFilesDir may be null on
         // headless API-34 TCG emulators; private cache is always writable by the test UID.
         // The CI script exports this directory with run-as after instrumentation completes.
-        Context context = InstrumentationRegistry.getInstrumentation().getContext();
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         File cache = context.getCacheDir();
         if (cache == null || (!cache.isDirectory() && !cache.mkdirs())) {
             throw new AssertionError("Instrumentation cache directory is unavailable: " + cache);
@@ -176,7 +176,7 @@ public final class SixPageUiTest {
                 : page.equals("NOTIFICATIONS") ? "VOICE ENGINE & NOTIFICATION CENTER"
                 : null;
             assertTrue("No audited content anchor configured for page: " + page, anchor != null);
-            BySelector contentSelector = By.textContains(anchor);
+            BySelector contentSelector = By.pkg(PACKAGE).textContains(anchor);
             boolean contentVisible = device.wait(Until.hasObject(contentSelector), 15_000L);
             // A horizontal navigation tab can receive a tap while the scroll container is
             // still settling on slow TCG emulators. Retry the same tab once before failing.

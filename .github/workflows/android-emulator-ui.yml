@@ -53,15 +53,25 @@ jobs:
 
       - name: Build app, unit tests, and instrumentation APKs
         run: |
-          gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+          gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:prepareCiOrchestratorApks
 
       - name: Verify packaged debug and test manifests
         shell: bash
         run: |
           set -Eeuo pipefail
+          bash -n .github/scripts/run-emulator-ui-tests.sh
           analyzer="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
           "$analyzer" manifest print app/build/outputs/apk/debug/app-debug.apk > artifacts/diagnostics/debug-packaged-manifest.xml
           "$analyzer" manifest print app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk > artifacts/diagnostics/test-packaged-manifest.xml
+          for entry in 'app/build/outputs/apk/debug/app-debug.apk|com.xauusdpro99' 'app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk|com.xauusdpro99.test' 'app/build/ci-test-apks/orchestrator-1.6.1.apk|androidx.test.orchestrator' 'app/build/ci-test-apks/test-services-1.6.0.apk|androidx.test.services'; do
+            apk="${entry%%|*}"
+            expected="${entry#*|}"
+            test -s "$apk"
+            actual=$("$analyzer" manifest application-id "$apk")
+            test "$actual" = "$expected"
+            sha256sum "$apk" >> artifacts/diagnostics/apk-checksums.txt
+            "$analyzer" manifest print "$apk" > "artifacts/diagnostics/$expected-manifest.xml"
+          done
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
           ns = '{http://schemas.android.com/apk/res/android}'
