@@ -55,11 +55,19 @@ jobs:
         run: |
           gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
 
+      - name: Detect and enable KVM
+        id: acceleration
+        shell: bash
+        run: |
+          if [ -c /dev/kvm ]; then
+            sudo chmod a+rw /dev/kvm
+            echo "disable=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "disable=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Run orchestrated tests and collect diagnostics before emulator teardown
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          # GitHub-hosted Linux runners do not expose KVM. Explicitly permit
-          # the emulator's TCG software CPU backend instead of failing at launch.
           ANDROID_I_WANT_MY_TCG: "yes"
         with:
           api-level: 34
@@ -68,15 +76,15 @@ jobs:
           profile: pixel_2
           cores: 2
           emulator-options: -memory 3072 -no-window -gpu swiftshader -no-snapshot -no-audio -no-boot-anim -camera-back none -camera-front none
-          disable-linux-hw-accel: true
+          disable-linux-hw-accel: ${{ steps.acceleration.outputs.disable }}
           disable-animations: true
           emulator-boot-timeout: 1200
           pre-emulator-launch-script: |
             set -eu
             mkdir -p artifacts/diagnostics artifacts/ui-screenshots
             echo "ANDROID_I_WANT_MY_TCG=${ANDROID_I_WANT_MY_TCG:-unset}" > artifacts/diagnostics/emulator-mode.txt
-            emulator -version > artifacts/diagnostics/emulator-version.txt 2>&1 || true
-            emulator -accel-check > artifacts/diagnostics/emulator-acceleration-check.txt 2>&1 || true
+            "$ANDROID_HOME/emulator/emulator" -version > artifacts/diagnostics/emulator-version.txt 2>&1 || true
+            "$ANDROID_HOME/emulator/emulator" -accel-check > artifacts/diagnostics/emulator-acceleration-check.txt 2>&1 || true
             lscpu > artifacts/diagnostics/host-cpu.txt 2>&1 || true
             if [ -f "$ANDROID_AVD_HOME/test.avd/config.ini" ]; then
               cat "$ANDROID_AVD_HOME/test.avd/config.ini" > artifacts/diagnostics/avd-config.ini

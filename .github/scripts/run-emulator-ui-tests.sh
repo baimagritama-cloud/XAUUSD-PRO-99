@@ -13,39 +13,11 @@ start_live_evidence_capture() {
 
   # Keep a continuous logcat stream while Gradle/UTP is running. UTP uninstalls
   # the test APK during teardown, before the Gradle command returns on failure.
-  timeout 30 adb logcat -b all -v threadtime > "$dir/logcat-live.txt" 2>&1 &
+  adb logcat -b all -v threadtime > "$dir/logcat-live.txt" 2>&1 &
   LIVE_LOGCAT_PID=$!
 
-  (
-    last_file_count=-1
-    while true; do
-      date -u +"%Y-%m-%dT%H:%M:%SZ" >> "$dir/device-resource-samples.txt"
-      adb shell cat /proc/meminfo >> "$dir/device-resource-samples.txt" 2>&1 || true
-      adb shell cat /proc/pressure/cpu >> "$dir/device-resource-samples.txt" 2>&1 || true
-
-      adb shell pm path com.xauusdpro99.test > "$dir/test-package-path.txt" 2>&1 || true
-      adb shell pm list instrumentation > "$dir/instrumentations-live.txt" 2>&1 || true
-
-      if adb shell run-as com.xauusdpro99.test test -d cache/ui-screenshots 2>/dev/null; then
-        adb shell run-as com.xauusdpro99.test find cache/ui-screenshots -type f \
-          > "$dir/runner-cache-files.txt" 2>&1 || true
-        file_count=$(grep -c '.' "$dir/runner-cache-files.txt" 2>/dev/null || true)
-        file_count="${file_count:-0}"
-        if [[ "$file_count" -gt "$last_file_count" ]]; then
-          tmp="$dir/runner-cache.tar.tmp"
-          if adb exec-out run-as com.xauusdpro99.test tar -C cache -cf - ui-screenshots \
-              > "$tmp" 2> "$dir/runner-cache-export.err"; then
-            mv "$tmp" "$dir/runner-cache.tar"
-            last_file_count="$file_count"
-          else
-            rm -f "$tmp"
-          fi
-        fi
-      fi
-      sleep 5
-    done
-  ) &
-  LIVE_WATCHER_PID=$!
+  # Avoid concurrent package-manager and run-as polling during instrumentation.
+  LIVE_WATCHER_PID=""
 }
 
 stop_live_evidence_capture() {
@@ -155,12 +127,35 @@ wait_for_stable_framework() {
 timeout 30 adb logcat -b all -d -v threadtime > artifacts/diagnostics/pre-stage1-logcat.txt 2>&1 || true
 wait_for_stable_framework stage1
 
+# Install once and retain packages until evidence has been collected.
+gradle --no-daemon :app:dependencies --configuration androidTestUtil > artifacts/diagnostics/test-util-dependencies.txt
+orchestrator=$(find "$HOME/.gradle/caches/modules-2/files-2.1/androidx.test/orchestrator/1.6.1" -name '*.apk' -print -quit)
+services=$(find "$HOME/.gradle/caches/modules-2/files-2.1/androidx.test.services/test-services" -name '*.apk' -print -quit)
+test -f "$orchestrator"
+test -f "$services"
+timeout 180 adb install -r -t "$services"
+timeout 180 adb install -r -t "$orchestrator"
+timeout 180 adb install -r -t app/build/outputs/apk/debug/app-debug.apk
+timeout 180 adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+wait_for_stable_framework stage1-installed
+
+run_orchestrated() {
+  local stage="$1" method="$2" result=0
+  local output="artifacts/diagnostics/${stage}-instrumentation.txt"
+  timeout 600 adb shell 'CLASSPATH=$(pm path androidx.test.services | cut -d: -f2) app_process / androidx.test.services.shellexecutor.ShellMain am instrument -w -r -e class com.xauusdpro99.SixPageUiTest#'"$method"' -e targetInstrumentation com.xauusdpro99.test/androidx.test.runner.AndroidJUnitRunner androidx.test.orchestrator/androidx.test.orchestrator.AndroidTestOrchestrator' > "$output" 2>&1 || result=$?
+  cat "$output"
+  [[ "$result" -eq 0 ]] || return "$result"
+  if grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|shortMsg=|INSTRUMENTATION_STATUS_CODE: -[12]' "$output"; then
+    return 1
+  fi
+  grep -Eq 'OK \(1 test\)' "$output"
+}
+
 # Stage 1: run only the six-page landscape UI test. The portrait method remains
 # in source but is @Ignore during this stabilization phase.
 echo "STAGE 1/2: six-page landscape UI test"
 start_live_evidence_capture stage1
-gradle --no-daemon :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=com.xauusdpro99.SixPageUiTest#allSixPagesRenderInLandscape
+run_orchestrated stage1 allSixPagesRenderInLandscape
 stop_live_evidence_capture
 
 # Export screenshots immediately, before another instrumentation invocation can
@@ -194,8 +189,7 @@ echo "STAGE 1 PASSED: all six landscape page screenshots captured."
 wait_for_stable_framework stage2
 echo "STAGE 2/2: live market and Background Monitoring integration test"
 start_live_evidence_capture stage2
-gradle --no-daemon :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=com.xauusdpro99.SixPageUiTest#liveMarketAndBackgroundMonitoringRemainActiveAfterLeavingApp
+run_orchestrated stage2 liveMarketAndBackgroundMonitoringRemainActiveAfterLeavingApp
 stop_live_evidence_capture
 
 # Preserve Stage 2's independent test reports and logcat as separate evidence.
