@@ -49,7 +49,7 @@ public final class MarketMonitoringService extends Service
     private volatile boolean networkAvailable=true;
     private volatile Map<CandleTimeframe,CandleEngine.Snapshot> snapshots=Collections.emptyMap();
     private volatile boolean stopping;
-    private long lastCalendarPoll;
+    private volatile long lastCalendarPoll;
 
     public static void start(Context c) {
         Intent i=new Intent(c,MarketMonitoringService.class).setAction(ACTION_START);
@@ -84,7 +84,7 @@ public final class MarketMonitoringService extends Service
             candleEngine.refreshAll();
             refreshFreshness();
         },2,2,TimeUnit.MINUTES);
-        scheduler.scheduleAtFixedRate(this::pollCalendar,1,15,TimeUnit.MINUTES);
+        scheduler.scheduleAtFixedRate(this::pollCalendar,0,15,TimeUnit.MINUTES);
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId){
         if(intent!=null&&ACTION_STOP.equals(intent.getAction())){stopSelf();return START_NOT_STICKY;}
@@ -250,23 +250,23 @@ public final class MarketMonitoringService extends Service
         }
     }
     private void pollCalendarIfDue(){if(System.currentTimeMillis()-lastCalendarPoll>15*60_000L)pollCalendar();}
-    private void pollCalendar(){
+    private synchronized void pollCalendar(){
+        if(stopping||!networkAvailable)return;
         long now=System.currentTimeMillis();if(now-lastCalendarPoll<60_000L)return;lastCalendarPoll=now;
         SharedPreferences prefs=getSharedPreferences("economic_news_settings",MODE_PRIVATE);
-        String endpoint=prefs.getString("calendar_endpoint","");
+        String endpoint=prefs.getString("calendar_endpoint",EconomicCalendarClient.PRIMARY);
         String key=CalendarCredentialStore.load(this);
-        if(endpoint.isEmpty()||key.isEmpty()){news.markUnavailable("kalender belum dikonfigurasi untuk background monitoring",now);return;}
         calendarExecutor.execute(()->{
             try{
-                EconomicCalendarClient.Response r=EconomicCalendarClient.fetch(endpoint,key);
-                if(news.updateJson(r.body,r.source,r.receivedAtMs)){
+                if(EconomicCalendarClient.refresh(news,endpoint,key)){
                     log("ECONOMIC CALENDAR LIVE — "+news.getEvents().size()+" event");
-                    dispatchCalendarAlerts(r.receivedAtMs);
+                    dispatchCalendarAlerts(System.currentTimeMillis());
                 }
             }catch(Exception e){news.markUnavailable("calendar fetch gagal: "+e.getClass().getSimpleName(),System.currentTimeMillis());log("CALENDAR FETCH ERROR: "+e.getMessage());}
         });
     }
-    private void dispatchCalendarAlerts(long nowMs){
+    private synchronized void dispatchCalendarAlerts(long nowMs){
+        if(stopping||!networkAvailable)return;
         news.markStale(nowMs);
         for(EconomicNewsEngine.Alert a:news.evaluateAlerts(nowMs)){
             SharedPreferences np=getSharedPreferences("notification_settings",MODE_PRIVATE);
@@ -284,7 +284,7 @@ public final class MarketMonitoringService extends Service
             boolean quiet=np.getBoolean("quiet_enabled",false)&&NotificationPolicy.isQuietHours(
                 NotificationPolicy.currentMinuteOfDay(),np.getInt("quiet_start",1320),np.getInt("quiet_end",420));
             if(id>0&&np.getBoolean("voice_enabled",true)&&!quiet&&voice!=null)
-                voice.speakAlert("NEWS_ALERT","NEWS",Double.NaN,a.title(),"INFO",true);
+                voice.speakAlert("NEWS_ALERT","NEWS",Double.NaN,a.title()+". "+msg,"INFO",news.getDataStatus()==EconomicNewsEngine.DataStatus.LIVE);
         }
     }
     private static double lastClose(CandleEngine.Snapshot s){return s==null||s.closed.isEmpty()?Double.NaN:s.closed.get(s.closed.size()-1).close;}
