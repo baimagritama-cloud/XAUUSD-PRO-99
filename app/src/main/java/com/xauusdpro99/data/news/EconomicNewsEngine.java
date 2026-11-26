@@ -88,6 +88,10 @@ public final class EconomicNewsEngine {
                 if(!el.isJsonObject()) continue;
                 JsonObject o=el.getAsJsonObject();
                 String country=str(o,"Country","country","currency");
+                if(country==null && EconomicCalendarClient.FALLBACK.equals(sourceUrl)) {
+                    String agency=str(o,"source");
+                    if(agency!=null && java.util.Arrays.asList("bea","dol","bls","fed","census").contains(agency.toLowerCase(Locale.US))) country="US";
+                }
                 String name=str(o,"Event","event","Name","name","Category","category","title","eventName");
                 if(name==null || !isUsdCountry(country) || !isRelevant(name)) continue;
                 Long time=parseTime(str(o,"ts","scheduledAt","Date","date","datetime","Time","time"));
@@ -95,6 +99,7 @@ public final class EconomicNewsEngine {
                 String id=first(str(o,"CalendarId","CalendarID","calendarId","id","Ticker","ticker"),
                         country+"|"+name+"|"+time);
                 String releaseSource=first(str(o,"Source","source"),sourceUrl);
+                if(EconomicCalendarClient.FALLBACK.equals(sourceUrl)) releaseSource="Data: XOOMAR — https://xoomar.com/markets/calendar — "+releaseSource;
                 String previous=value(o,"Previous","previous");
                 String forecast=value(o,"Forecast","forecast");
                 String actual=value(o,"Actual","actual");
