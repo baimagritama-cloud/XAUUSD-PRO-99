@@ -3,14 +3,22 @@ on:
   push:
     paths:
       - '.github/workflows/calendar-provider-probe.yml'
+      - 'app/src/main/java/com/xauusdpro99/data/news/**'
+      - 'app/src/test/java/com/xauusdpro99/data/news/**'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
       - name: Probe public calendar endpoints
         shell: bash
         run: |
@@ -47,9 +55,15 @@ jobs:
                   inspect(obj)
               except Exception as e: print(type(e).__name__,str(e))
           PY
+      - name: Verify live responses using production Java parser and real fallback
+        env:
+          VERIFY_LIVE_CALENDAR: '1'
+        run: gradle --no-daemon :app:testDebugUnitTest --tests '*LiveCalendarVerificationTest' --rerun-tasks
       - name: Upload probe evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: calendar-provider-probe
-          path: evidence/
+          path: |
+            evidence/
+            app/build/test-results/testDebugUnitTest/
