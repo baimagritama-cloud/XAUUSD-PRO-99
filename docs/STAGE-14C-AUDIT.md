@@ -30,3 +30,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 
 ## Gate 2/3 landscape chart regression
 - Build #116 and UI #47 passed on 284ee8c0, but visual review found insufficient landscape chart space. Compact quote metadata horizontally and combine OHLC details with overlay controls in landscape. Add chart viewport assertion (at least one sixth of display height). Pending CI and visual verification; no gate pass claimed.
+
+## Gate 4 — OHLC source audit
+- Build #117 (45878165525) and UI #48 (45878165617) succeeded on b2f235dfeee32bacad43e4b0444dee215b1751f2; chart viewport assertion passed. Visual review remains pending.
+- BiquoteOhlcClient requests limit=1000 from https://biquote.io/api/XAUUSD/ohlc, validates symbol and parses bars. MultiTimeframeEngine aggregates M2/M3 from the full raw M1 response before retaining 300 closed candles. No evidence that local retention causes the short history. Actual server response count and documented pagination support remain unverified; do not invent pagination parameters or candles. Gate 4 remains open.
