@@ -124,7 +124,7 @@ public final class EntryRiskEngine {
  private static double atr(Input x,CandlePatternEngine.Pattern p){
   CandleTimeframe tf=p==null?CandleTimeframe.M5:tf(p.timeframe);IndicatorEngine.Result r=x.indicators==null?null:x.indicators.get(tf);
   if(r==null||r.validity!=IndicatorEngine.Validity.LIVE||r.atr14==null)r=x.indicators==null?null:x.indicators.get(CandleTimeframe.M5);
-  return r==null||r.atr14==null?Double.NaN:r.atr14;
+  return r==null||r.validity!=IndicatorEngine.Validity.LIVE||r.atr14==null||!pos(r.atr14)?Double.NaN:r.atr14;
  }
  private static double stop(Input x,SignalScoringEngine.Direction d,CandlePatternEngine.Pattern p,double e,double b){
   if(p==null||!pos(b))return Double.NaN;double anchor=d==SignalScoringEngine.Direction.BUY?p.patternLow:p.patternHigh;
