@@ -55,6 +55,23 @@ jobs:
         run: |
           gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
 
+      - name: Verify packaged debug and test manifests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          analyzer="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
+          "$analyzer" manifest print app/build/outputs/apk/debug/app-debug.apk > artifacts/diagnostics/debug-packaged-manifest.xml
+          "$analyzer" manifest print app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk > artifacts/diagnostics/test-packaged-manifest.xml
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          ns = '{http://schemas.android.com/apk/res/android}'
+          for kind in ('debug', 'test'):
+              root = ET.parse(f'artifacts/diagnostics/{kind}-packaged-manifest.xml').getroot()
+              names = {p.get(ns+'name') for p in root.findall('./queries/package')}
+              assert {'androidx.test.orchestrator', 'androidx.test.services'} <= names, (kind, names)
+          PY
+          gradle --no-daemon :app:dependencies --configuration debugAndroidTestRuntimeClasspath > artifacts/diagnostics/test-runtime-dependencies.txt
+
       - name: Detect and enable KVM
         id: acceleration
         shell: bash
@@ -86,9 +103,7 @@ jobs:
             "$ANDROID_HOME/emulator/emulator" -version > artifacts/diagnostics/emulator-version.txt 2>&1 || true
             "$ANDROID_HOME/emulator/emulator" -accel-check > artifacts/diagnostics/emulator-acceleration-check.txt 2>&1 || true
             lscpu > artifacts/diagnostics/host-cpu.txt 2>&1 || true
-            if [ -f "$ANDROID_AVD_HOME/test.avd/config.ini" ]; then
-              cat "$ANDROID_AVD_HOME/test.avd/config.ini" > artifacts/diagnostics/avd-config.ini
-            fi
+            if [ -f "$ANDROID_AVD_HOME/test.avd/config.ini" ]; then cat "$ANDROID_AVD_HOME/test.avd/config.ini" > artifacts/diagnostics/avd-config.ini; fi
           # Keep shell functions, loops and EXIT traps in one Bash process.
           script: bash .github/scripts/run-emulator-ui-tests.sh
 

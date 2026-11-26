@@ -138,6 +138,12 @@ timeout 180 adb install -r -t "$orchestrator"
 timeout 180 adb install -r -t app/build/outputs/apk/debug/app-debug.apk
 timeout 180 adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 wait_for_stable_framework stage1-installed
+timeout 30 adb shell dumpsys package androidx.test.orchestrator > artifacts/diagnostics/orchestrator-package.txt
+timeout 30 adb shell dumpsys package androidx.test.services > artifacts/diagnostics/test-services-package.txt
+timeout 30 adb shell dumpsys package queries > artifacts/diagnostics/package-visibility.txt
+grep -F 'OrchestratorService' artifacts/diagnostics/orchestrator-package.txt
+timeout 30 adb shell pm list instrumentation > artifacts/diagnostics/installed-instrumentations.txt
+grep -F 'com.xauusdpro99.test/androidx.test.runner.AndroidJUnitRunner' artifacts/diagnostics/installed-instrumentations.txt
 
 run_orchestrated() {
   local stage="$1" method="$2" result=0
@@ -148,7 +154,7 @@ run_orchestrated() {
   if grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|shortMsg=|INSTRUMENTATION_STATUS_CODE: -[12]' "$output"; then
     return 1
   fi
-  grep -Eq 'OK \(1 test\)' "$output"
+  grep -Eq 'OK \(1 test\)|Tests found: 1, Tests run: 1,  Failures: 0' "$output"
 }
 
 # Stage 1: run only the six-page landscape UI test. The portrait method remains
