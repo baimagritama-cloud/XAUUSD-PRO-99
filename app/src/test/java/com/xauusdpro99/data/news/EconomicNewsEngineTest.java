@@ -80,4 +80,27 @@ public class EconomicNewsEngineTest {
         assertTrue(e.evaluateAlerts(release-45*60_000L).isEmpty());
         assertEquals(EconomicNewsEngine.DataStatus.STALE,e.getDataStatus());
     }
+
+    @Test public void showMyTradesEpochAndMissingForecast(){
+        EconomicNewsEngine e=new EconomicNewsEngine();
+        assertTrue(e.updateJson("{\"events\":[{\"id\":\"a\",\"currency\":\"USD\",\"title\":\"CPI\",\"ts\":1800007200,\"impact\":\"high\",\"previous\":\"2.4\",\"forecast\":null}]}",EconomicCalendarClient.PRIMARY,NOW));
+        assertEquals(NOW+7200000L,e.getEvents().get(0).releaseAtMs);
+        assertNull(e.getEvents().get(0).forecast);
+        assertEquals(EconomicNewsEngine.Impact.HIGH,e.getEvents().get(0).impact);
+        assertEquals(1,e.evaluateAlerts(NOW).size());
+    }
+    @Test public void xoomarAgencyValidationAndProviderSwitchDeduplication(){
+        EconomicNewsEngine e=new EconomicNewsEngine();
+        assertTrue(e.updateJson("{\"events\":[{\"id\":\"a\",\"currency\":\"USD\",\"title\":\"CPI\",\"ts\":1800007200}]}",EconomicCalendarClient.PRIMARY,NOW));
+        assertEquals(1,e.evaluateAlerts(NOW).size());
+        String date=java.time.Instant.ofEpochMilli(NOW+7200000L).toString();
+        assertTrue(e.updateJson("{\"data\":[{\"eventName\":\"CPI\",\"source\":\"bls\",\"scheduledAt\":\""+date+"\",\"importance\":\"high\"},{\"eventName\":\"CPI\",\"source\":\"unknown\",\"scheduledAt\":\""+date+"\"}]}",EconomicCalendarClient.FALLBACK,NOW));
+        assertEquals(1,e.getEvents().size());
+        assertTrue(e.evaluateAlerts(NOW).isEmpty());
+    }
+    @Test public void historicalActualDoesNotTriggerStartupAlert(){
+        EconomicNewsEngine e=new EconomicNewsEngine();
+        assertTrue(e.updateJson(json("2027-01-15T13:15:00","2.6"),"https://calendar.example/api",NOW+86400000L));
+        assertTrue(e.evaluateAlerts(NOW+86400000L).isEmpty());
+    }
 }
