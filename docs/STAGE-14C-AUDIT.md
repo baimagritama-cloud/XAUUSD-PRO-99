@@ -34,3 +34,8 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## Gate 4 — OHLC source audit
 - Build #117 (45878165525) and UI #48 (45878165617) succeeded on b2f235dfeee32bacad43e4b0444dee215b1751f2; chart viewport assertion passed. Visual review remains pending.
 - BiquoteOhlcClient requests limit=1000 from https://biquote.io/api/XAUUSD/ohlc, validates symbol and parses bars. MultiTimeframeEngine aggregates M2/M3 from the full raw M1 response before retaining 300 closed candles. No evidence that local retention causes the short history. Actual server response count and documented pagination support remain unverified; do not invent pagination parameters or candles. Gate 4 remains open.
+
+## 2026-11-27 WIB — CI evidence at e704ba18
+- Build #140 (45887905859) and UI #71 (45887905821) succeeded at e704ba18924d9bd663843cd140e27c22f2d13204. UI job 140143094368 logs confirm unit-test task and APK build succeeded, three instrumentation invocations each reported OK (1 test), and Stage 1 explicitly reported all twelve landscape and portrait screenshots captured. Artifact upload succeeded. Gates 2/3/9/10/11/12: execution evidence only; visual review and coverage of individual assertions remain open.
+- Calendar Provider Probe #3 (45887882969) succeeded at 544eda4ad54e8d93c664dee3d70da66bcfa4bf8a after Probe #2 failed. Gate 8 remains open pending provider payload and application integration verification.
+- No workflow rerun requested; no trading logic changed. Binary screenshot contents have not been inspected for UI #71.
