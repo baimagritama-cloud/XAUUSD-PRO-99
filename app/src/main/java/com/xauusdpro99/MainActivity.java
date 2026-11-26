@@ -756,6 +756,9 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
     }
 
     private void dispatchEconomicAlerts(long nowMs) {
+        SharedPreferences runtime=getSharedPreferences("monitoring_runtime",MODE_PRIVATE);
+        long heartbeat=runtime.getLong("service_heartbeat_at",0L);
+        if(runtime.getBoolean("service_running",false)&&heartbeat>0&&nowMs>=heartbeat&&nowMs-heartbeat<=60_000L)return;
         for(EconomicNewsEngine.Alert a:economicNewsEngine.evaluateAlerts(nowMs)) {
             EconomicNewsEngine.Event e=a.event;
             String summary="Negara "+e.country+". Waktu "+DateFormat.getDateTimeInstance().format(new Date(e.releaseAtMs))
