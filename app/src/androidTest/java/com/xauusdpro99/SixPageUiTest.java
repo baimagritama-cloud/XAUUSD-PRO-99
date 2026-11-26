@@ -54,6 +54,14 @@ public final class SixPageUiTest {
         // Keep the complete integration test in the same landscape-only CI orientation.
         launchApp(device, false);
 
+        // Exercise both orientations within the same running task.
+        device.setOrientationPortrait();
+        assertTrue("Portrait rotation did not complete", device.wait(Until.hasObject(By.text("LIVE CHART")), 30000L));
+        assertTrue("Portrait dimensions incorrect", device.getDisplayHeight() > device.getDisplayWidth());
+        device.setOrientationLandscape();
+        assertTrue("Landscape rotation did not complete", device.wait(Until.hasObject(By.text("LIVE CHART")), 30000L));
+        assertTrue("Landscape dimensions incorrect", device.getDisplayWidth() > device.getDisplayHeight());
+
         // Start the real production foreground service; no fake feed or disabled feature flags.
         MarketMonitoringService.start(context);
         Context app = context.getApplicationContext();
@@ -134,6 +142,12 @@ public final class SixPageUiTest {
         click(device, "M1");
         click(device, "EMA: OFF");
         click(device, "INDICATOR: RSI14");
+        assertTrue("Indicator selection did not change", device.wait(Until.hasObject(By.text("INDICATOR: MOM14")), 10000L));
+        assertTrue("EMA selection did not change", device.wait(Until.hasObject(By.text("EMA: 10")), 10000L));
+        click(device, "DETAIL OHLC");
+        assertTrue("OHLC detail dialog missing", device.wait(Until.hasObject(By.textContains("OHLC — seluruh timeframe")), 10000L));
+        click(device, "TUTUP");
+        assertTrue("Chart controls unavailable after closing details", device.wait(Until.hasObject(By.text("DETAIL OHLC")), 10000L));
         device.waitForIdle();
     }
 
