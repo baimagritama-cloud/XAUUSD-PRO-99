@@ -255,4 +255,42 @@ public final class SixPageUiTest {
         control.click();
         device.waitForIdle();
     }
+
+    @Test public void calendarNotificationDeliveryAndVoiceSafety() throws Exception {
+        Context c=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        android.app.NotificationManager nm=c.getSystemService(android.app.NotificationManager.class);
+        if(android.os.Build.VERSION.SDK_INT>=33){
+            InstrumentationRegistry.getInstrumentation().getUiAutomation().grantRuntimePermission(c.getPackageName(),android.Manifest.permission.POST_NOTIFICATIONS);
+        }
+        com.xauusdpro99.data.news.EconomicNewsEngine engine=new com.xauusdpro99.data.news.EconomicNewsEngine();
+        long now=System.currentTimeMillis(), release=now+7200000L;
+        String payload="{\"events\":[{\"currency\":\"USD\",\"title\":\"CPI instrumentation fixture\",\"ts\":"+release+",\"impact\":\"high\"}]}";
+        assertTrue(engine.updateJson(payload,com.xauusdpro99.data.news.EconomicCalendarClient.PRIMARY,now));
+        java.util.List<com.xauusdpro99.data.news.EconomicNewsEngine.Alert> alerts=engine.evaluateAlerts(now);
+        org.junit.Assert.assertEquals(1,alerts.size());
+        com.xauusdpro99.notification.NotificationCenter center=new com.xauusdpro99.notification.NotificationCenter(c);
+        String title="TEST ONLY — "+alerts.get(0).title()+" "+now;
+        long id=center.recordAlert(title,"Instrumentation fixture; not live market data",now,now,0);
+        assertTrue(id>0);
+        try{
+            center.show(c,id,title,"Instrumentation fixture; not live market data");
+            boolean found=false;
+            for(int i=0;i<20&&!found;i++){
+                for(android.service.notification.StatusBarNotification n:nm.getActiveNotifications())
+                    if(n.getId()==(int)(id&0x7fffffff))found=true;
+                if(!found)Thread.sleep(250);
+            }
+            assertTrue("Android notification not posted",found);
+            assertTrue("Duplicate alert was recorded",center.recordAlert(title,"duplicate",now,now,0)<0);
+            java.util.concurrent.atomic.AtomicReference<com.xauusdpro99.voice.VoiceEngine> voice=new java.util.concurrent.atomic.AtomicReference<>();
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->voice.set(new com.xauusdpro99.voice.VoiceEngine(c,status->android.util.Log.i("NewsVoiceTest",status))));
+            try{
+                String before=c.getSharedPreferences("voice_history",Context.MODE_PRIVATE).getString("entries","");
+                voice.get().speakAlert("NEWS_ALERT","NEWS",Double.NaN,"STALE_TEST_ONLY","INFO",false);
+                Thread.sleep(1000);
+                org.junit.Assert.assertEquals(before,c.getSharedPreferences("voice_history",Context.MODE_PRIVATE).getString("entries",""));
+                android.util.Log.i("NewsVoiceTest","Stale voice suppression verified; TTS status="+voice.get().getStatus()+"; audible output not asserted");
+            }finally{InstrumentationRegistry.getInstrumentation().runOnMainSync(()->voice.get().shutdown());}
+        }finally{nm.cancel((int)(id&0x7fffffff));center.close();}
+    }
 }
