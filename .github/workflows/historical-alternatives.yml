@@ -1,0 +1,21 @@
+name: Alternative historical source audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/historical-alternatives.yml'
+      - 'scripts/historical-alternatives.py'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/historical-alternatives.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: historical-alternatives
+          path: audit-alternatives/
