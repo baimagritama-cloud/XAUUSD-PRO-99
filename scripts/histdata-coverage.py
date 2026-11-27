@@ -106,7 +106,7 @@ def audit():
     starts=[x[0] for x in intervals]; prefix=[]; end=-1
     for a,b,kind in intervals:end=max(end,b);prefix.append(end)
     valid_times=sorted(ts for ts in seen if ts not in conflicts)
-    gaps=Counter()
+    gaps=Counter(); unmatched=[]; unmatched_classes=Counter(); conflict_times=sorted(conflicts)
     for a,b in zip(valid_times,valid_times[1:]):
         if b-a<=60:continue
         i=bisect.bisect_left(starts,b)-1
@@ -118,7 +118,21 @@ def audit():
             gaps['possible_weekend_from_ohlc']+=1
         else:gaps['other_observed_gap']+=1
         if i>=0 and prefix[i]>a:gaps['overlaps_provider_report']+=1
-        else:gaps['no_report_overlap']+=1
+        else:
+            gaps['no_report_overlap']+=1
+            missing=(b-a)//60-1
+            quarantined=bisect.bisect_left(conflict_times,b)-bisect.bisect_right(conflict_times,a)
+            if quarantined==missing:kind='QUARANTINED_CONFLICT_ONLY'
+            elif quarantined:kind='MIXED_CONFLICT_AND_MISSING'
+            elif left.weekday()==4 and right.weekday() in (6,0) and 36*3600<=b-a<=(60 if right.weekday()==6 else 84)*3600:kind='POSSIBLE_WEEKEND'
+            elif left.date()==right.date() and left.hour in (15,16,17) and 3300<=b-a<=3900:kind='POSSIBLE_DAILY_PAUSE'
+            else:kind='UNEXPLAINED_MISSING_MINUTES'
+            unmatched_classes[kind]+=1
+            unmatched.append({'previous_utc':a,'next_utc':b,'missing_minutes':missing,'quarantined_minutes':quarantined,'candidate':kind,'first_affected_day_utc':(a+60)//86400*86400,'last_affected_day_utc':(b-60)//86400*86400,'first_affected_week_utc':(a+60+259200)//604800*604800-259200,'last_affected_week_utc':(b-60+259200)//604800*604800-259200})
+    (out/'unmatched-gaps.json').write_text(json.dumps(unmatched,indent=2))
+    report['histdata']['unmatched_gap_audit']={'classes':dict(unmatched_classes),'total':len(unmatched),'missing_minutes':sum(x['missing_minutes'] for x in unmatched),'quarantined_minutes':sum(x['quarantined_minutes'] for x in unmatched),'calendar_verified':False}
+    print(json.dumps(report['histdata']['unmatched_gap_audit']),flush=True)
+    if len(unmatched)!=gaps['no_report_overlap'] or sum(unmatched_classes.values())!=len(unmatched):raise ValueError('Unmatched gap reconciliation failed')
     report['histdata']['gap_classification']={'classes':dict(classes),'malformed':malformed,'duration_mismatch':duration_mismatch,'duration_offsets_seconds':dict(duration_offsets),'outside_observed_offset_pattern':unexplained_duration,'ohlc_gaps':dict(gaps),'calendar_verified':False,'note':'Overlap is diagnostic only; no inferred closure is certified.'}
     print(json.dumps(report['histdata']['gap_classification']),flush=True)
     if not intervals or malformed or unexplained_duration:raise ValueError('Missing or malformed provider gap metadata')
