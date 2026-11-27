@@ -55,10 +55,10 @@ public final class SixPageUiTest {
         launchApp(device, false);
 
         // Exercise both orientations within the same running task.
-        device.setOrientationPortrait();
+        awaitOrientation(device, true);
         assertTrue("Portrait rotation did not complete", device.wait(Until.hasObject(By.text("LIVE CHART")), 30000L));
         assertTrue("Portrait dimensions incorrect", device.getDisplayHeight() > device.getDisplayWidth());
-        device.setOrientationLandscape();
+        awaitOrientation(device, false);
         assertTrue("Landscape rotation did not complete", device.wait(Until.hasObject(By.text("LIVE CHART")), 30000L));
         assertTrue("Landscape dimensions incorrect", device.getDisplayWidth() > device.getDisplayHeight());
 
@@ -126,6 +126,8 @@ public final class SixPageUiTest {
         device.executeShellCommand("pm grant " + PACKAGE + " android.permission.POST_NOTIFICATIONS");
         device.executeShellCommand("am start -W -n " + PACKAGE + "/.MainActivity");
 
+        awaitOrientation(device, portrait);
+
         // Wait for a stable app-owned navigation element, not the REFRESH button.
         // The latter can be absent from the accessibility tree during first-frame/layout work.
         boolean packageVisible = device.wait(Until.hasObject(By.pkg(PACKAGE)), 60_000L);
@@ -134,6 +136,34 @@ public final class SixPageUiTest {
             + packageVisible + "; liveChartTab=" + mainUiReady
             + "; foreground=" + device.getCurrentPackageName(),
             packageVisible && mainUiReady);
+    }
+
+    // UiDevice rotation requests are asynchronous; verify the actual display and
+    // screenshot, not merely the presence of a navigation tab from the old layout.
+    private static void awaitOrientation(UiDevice device, boolean portrait) throws Exception {
+        long deadline = android.os.SystemClock.elapsedRealtime() + 30000L;
+        File probe = new File(InstrumentationRegistry.getInstrumentation().getTargetContext().getCacheDir(), "rotation-probe.png");
+        int stable = 0;
+        try {
+            while (android.os.SystemClock.elapsedRealtime() < deadline) {
+                if (portrait) device.setOrientationPortrait();
+                else device.setOrientationLandscape();
+                device.waitForIdle(1000L);
+                android.graphics.BitmapFactory.Options b = new android.graphics.BitmapFactory.Options();
+                b.inJustDecodeBounds = true;
+                boolean captured = device.takeScreenshot(probe);
+                if (captured) android.graphics.BitmapFactory.decodeFile(probe.getAbsolutePath(), b);
+                boolean displayMatches = portrait ? device.getDisplayHeight() > device.getDisplayWidth()
+                    : device.getDisplayWidth() > device.getDisplayHeight();
+                boolean screenshotMatches = captured && b.outWidth > 0 && b.outHeight > 0
+                    && (portrait ? b.outHeight > b.outWidth : b.outWidth > b.outHeight);
+                stable = displayMatches && screenshotMatches ? stable + 1 : 0;
+                if (stable >= 2) return;
+                Thread.sleep(500L);
+            }
+            throw new AssertionError("Rotation did not stabilize: portrait=" + portrait
+                + "; display=" + device.getDisplayWidth() + "x" + device.getDisplayHeight());
+        } finally { probe.delete(); }
     }
 
     private static void exerciseChartControls(UiDevice device) {
@@ -157,6 +187,7 @@ public final class SixPageUiTest {
         File debug = new File(output, "debug");
         if (!debug.exists()) debug.mkdirs();
         for (String page : PAGES) {
+            awaitOrientation(device, orientation.equals("portrait"));
             UiObject2 nav = waitForText(device, page, 3_000L);
             for (int attempt = 0; nav == null && attempt < 12; attempt++) {
                 UiObject2 strip = device.wait(Until.findObject(By.desc("MAIN_PAGE_NAVIGATION")), 5_000L);
