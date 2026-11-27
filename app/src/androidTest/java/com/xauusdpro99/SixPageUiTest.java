@@ -178,6 +178,7 @@ public final class SixPageUiTest {
         UiObject2 chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
         assertTrue("Chart missing or too short", chart!=null && chart.getVisibleBounds().height() >= device.getDisplayHeight()/6);
         exerciseChartDrag(device, chart);
+        exerciseChartPinch(device);
         click(device, "DETAIL OHLC");
         assertTrue("OHLC detail dialog missing", device.wait(Until.hasObject(By.textContains("OHLC — seluruh timeframe")), 10000L));
         click(device, "TUTUP");
@@ -198,14 +199,14 @@ public final class SixPageUiTest {
     }
 
     private static int[] chartState(){
-        int[] state={-1,-1};
+        int[] state={-1,-1,-1};
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
             for(android.app.Activity activity:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
                     .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED)){
                 android.view.View view=findChart(activity.getWindow().getDecorView());
                 if(view instanceof LiveCandleChartView){
                     LiveCandleChartView chart=(LiveCandleChartView)view;
-                    state[0]=chart.chartClosedCount();state[1]=chart.chartPanBars();break;
+                    state[0]=chart.chartClosedCount();state[1]=chart.chartPanBars();state[2]=chart.chartVisibleBars();break;
                 }
             }
         });
@@ -230,6 +231,28 @@ public final class SixPageUiTest {
         int[] restored=chartState();
         assertTrue("Reverse drag did not move toward newer candles",restored[1]<after[1]);
         android.util.Log.i("ChartUiTest","Real chart drag verified: "+before[1]+" -> "+after[1]+" -> "+restored[1]+"; closed="+after[0]);
+    }
+
+    private static void exerciseChartPinch(UiDevice device){
+        UiObject2 chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
+        assertTrue("Chart missing before pinch",chart!=null);
+        int[] before=chartState();
+        assertTrue("Pinch requires real closed candles",before[0]>=2);
+        chart.setGestureMargin(Math.max(1,chart.getVisibleBounds().width()/10));
+        chart.pinchOpen(0.75f,400);
+        device.waitForIdle();
+        int[] enlarged=chartState();
+        assertTrue("Pinch open did not zoom in: "+before[2]+" -> "+enlarged[2],enlarged[2]<before[2]);
+        assertTrue("Zoom below minimum",enlarged[2]>=10);
+        chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
+        assertTrue("Chart missing after pinch open",chart!=null);
+        chart.setGestureMargin(Math.max(1,chart.getVisibleBounds().width()/10));
+        chart.pinchClose(0.75f,400);
+        device.waitForIdle();
+        int[] reduced=chartState();
+        assertTrue("Pinch close did not zoom out: "+enlarged[2]+" -> "+reduced[2],reduced[2]>enlarged[2]);
+        assertTrue("Zoom above maximum",reduced[2]<=300);
+        android.util.Log.i("ChartUiTest","Pinch viewport verified: "+before[2]+" -> "+enlarged[2]+" -> "+reduced[2]);
     }
 
     private static void exerciseTimeframes(UiDevice device) {

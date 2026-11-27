@@ -48,6 +48,7 @@ public final class LiveCandleChartView extends View {
         invalidate();
     }
     // Read-only viewport diagnostics for instrumentation; read on the UI thread.
+    int chartVisibleBars(){return visibleBars;}
     int chartPanBars(){return panBars;}
     int chartClosedCount(){return candles.size();}
     public void setEma(String value){ema=value==null?"OFF":value;invalidate();}

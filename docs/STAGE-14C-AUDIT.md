@@ -71,3 +71,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 
 ## Gate 2 — drag instrumentation follow-up
 - Add real touch swipes in both orientation tests and assert viewport offset changes in both directions using read-only chart state on the UI thread. Require real closed candles; no fixture or production feed changes. Pending CI; no gate pass claimed.
+
+## Gate 2 — drag verified and pinch follow-up
+- Run 46003335428 on 24853e0b68bbcd173878104b0d040f5a116ae7b2, job 140520253896, passed both orientation tests including bidirectional drag assertions, build/unit tests, background monitoring and calendar notification tests. Twelve screenshots captured; artifact 15199493448; visual review pending.
+- Add pinch open/close assertions in both orientations using read-only viewport scale, requiring real closed candles. Pending CI. No trading engine changes.
