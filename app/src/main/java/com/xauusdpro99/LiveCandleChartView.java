@@ -47,6 +47,9 @@ public final class LiveCandleChartView extends View {
         String next=tf==null?"--":tf;if(!next.equals(timeframe))panBars=0;timeframe=next;panBars=Math.min(panBars,Math.max(0,candles.size()-1));support=s;resistance=r;
         invalidate();
     }
+    // Read-only viewport diagnostics for instrumentation; read on the UI thread.
+    int chartPanBars(){return panBars;}
+    int chartClosedCount(){return candles.size();}
     public void setEma(String value){ema=value==null?"OFF":value;invalidate();}
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);float w=getWidth(),h=getHeight();if(w<80||h<100)return;

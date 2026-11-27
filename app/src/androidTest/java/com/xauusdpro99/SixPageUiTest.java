@@ -177,11 +177,59 @@ public final class SixPageUiTest {
         assertTrue("EMA selection did not change", device.wait(Until.hasObject(By.text("EMA: 10")), 10000L));
         UiObject2 chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
         assertTrue("Chart missing or too short", chart!=null && chart.getVisibleBounds().height() >= device.getDisplayHeight()/6);
+        exerciseChartDrag(device, chart);
         click(device, "DETAIL OHLC");
         assertTrue("OHLC detail dialog missing", device.wait(Until.hasObject(By.textContains("OHLC — seluruh timeframe")), 10000L));
         click(device, "TUTUP");
         assertTrue("Chart controls unavailable after closing details", device.wait(Until.hasObject(By.text("DETAIL OHLC")), 10000L));
         device.waitForIdle();
+    }
+
+    private static android.view.View findChart(android.view.View view) {
+        if(view instanceof LiveCandleChartView)return view;
+        if(view instanceof android.view.ViewGroup){
+            android.view.ViewGroup group=(android.view.ViewGroup)view;
+            for(int i=0;i<group.getChildCount();i++){
+                android.view.View found=findChart(group.getChildAt(i));
+                if(found!=null)return found;
+            }
+        }
+        return null;
+    }
+
+    private static int[] chartState(){
+        int[] state={-1,-1};
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+            for(android.app.Activity activity:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED)){
+                android.view.View view=findChart(activity.getWindow().getDecorView());
+                if(view instanceof LiveCandleChartView){
+                    LiveCandleChartView chart=(LiveCandleChartView)view;
+                    state[0]=chart.chartClosedCount();state[1]=chart.chartPanBars();break;
+                }
+            }
+        });
+        return state;
+    }
+
+    private static void exerciseChartDrag(UiDevice device, UiObject2 chart){
+        long deadline=android.os.SystemClock.elapsedRealtime()+45000L;
+        int[] before=chartState();
+        while(before[0]<2 && android.os.SystemClock.elapsedRealtime()<deadline){
+            android.os.SystemClock.sleep(500);before=chartState();
+        }
+        assertTrue("Drag requires real closed candles; count="+before[0],before[0]>=2);
+        android.graphics.Rect b=chart.getVisibleBounds();
+        int left=b.left+b.width()/10,right=b.left+b.width()/2,y=b.centerY();
+        assertTrue("Chart drag injection failed",device.swipe(left,y,right,y,30));
+        device.waitForIdle();
+        int[] after=chartState();
+        assertTrue("Drag did not move toward older candles: "+before[1]+" -> "+after[1],after[1]>before[1]);
+        assertTrue("Reverse drag injection failed",device.swipe(right,y,left,y,30));
+        device.waitForIdle();
+        int[] restored=chartState();
+        assertTrue("Reverse drag did not move toward newer candles",restored[1]<after[1]);
+        android.util.Log.i("ChartUiTest","Real chart drag verified: "+before[1]+" -> "+after[1]+" -> "+restored[1]+"; closed="+after[0]);
     }
 
     private static void exerciseTimeframes(UiDevice device) {

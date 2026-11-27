@@ -68,3 +68,6 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## Gate 2 — timeframe control coverage
 - Run 45988956940 tested ad0d68260492c4d144d8e5175400e37a0b47f52c successfully, artifact 15192872567. Visual review of latest labels pending.
 - Add accessible timeframe strip identifier and exercise every enum timeframe in both existing UI tests, scrolling to hidden controls and restoring M1. This asserts reachability and chart presence, not OHLC availability or correct data selection. Drag/pinch assertions remain pending. No production feed changes.
+
+## Gate 2 — drag instrumentation follow-up
+- Add real touch swipes in both orientation tests and assert viewport offset changes in both directions using read-only chart state on the UI thread. Require real closed candles; no fixture or production feed changes. Pending CI; no gate pass claimed.
