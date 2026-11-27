@@ -287,6 +287,26 @@ public final class SixPageUiTest {
         android.util.Log.i("ChartUiTest","Oldest and newest pan bounds verified");
     }
 
+    private static android.graphics.Rect awaitNativeChartBounds(UiDevice device){
+        long deadline=android.os.SystemClock.elapsedRealtime()+20000L;
+        android.graphics.Rect bounds=new android.graphics.Rect();
+        while(android.os.SystemClock.elapsedRealtime()<deadline){
+            device.waitForIdle(1000L);
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+                bounds.setEmpty();
+                for(android.app.Activity activity:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
+                        .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED)){
+                    android.view.View view=findChart(activity.getWindow().getDecorView());
+                    if(view!=null && view.isShown() && view.hasWindowFocus() && view.getGlobalVisibleRect(bounds))return;
+                    bounds.setEmpty();
+                }
+            });
+            if(bounds.width()>0 && bounds.height()>0 && !device.hasObject(By.text("Chart levels")))return bounds;
+            android.os.SystemClock.sleep(250);
+        }
+        throw new AssertionError("Native chart not visible/focused after gesture or dialog; bounds="+bounds+"; foreground="+device.getCurrentPackageName());
+    }
+
     private static void exerciseChartLabelGestures(UiDevice device){
         long deadline=android.os.SystemClock.elapsedRealtime()+45000L;
         while(chartState()[3]<1 && android.os.SystemClock.elapsedRealtime()<deadline)
@@ -299,15 +319,20 @@ public final class SixPageUiTest {
         assertTrue("Label tap injection failed",device.click(x,y));
         assertTrue("Intentional label tap did not open dialog",device.wait(Until.hasObject(By.text("Chart levels")),10000L));
         click(device,"OK");
+        b=awaitNativeChartBounds(device);
+        x=b.right-Math.max(2,b.width()/20);y=b.centerY();
         assertTrue("Label-area drag injection failed",device.swipe(x,y,b.left+b.width()/4,y,25));
         device.waitForIdle();
         assertTrue("Drag opened label dialog",!device.hasObject(By.text("Chart levels")));
-        chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
-        assertTrue("Chart missing after label drag",chart!=null);
+        b=awaitNativeChartBounds(device);
+        chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),20000L);
+        assertTrue("Chart accessibility missing after label drag; native bounds="+b,chart!=null);
         chart.setGestureMargin(Math.max(1,chart.getVisibleBounds().width()/10));
         chart.pinchOpen(0.75f,400);
         device.waitForIdle();
         assertTrue("Pinch opened label dialog",!device.hasObject(By.text("Chart levels")));
+        b=awaitNativeChartBounds(device);
+        x=b.right-Math.max(2,b.width()/20);y=b.centerY();
         assertTrue("Label tap after gestures failed",device.click(x,y));
         assertTrue("Label dialog no longer responds after gestures",device.wait(Until.hasObject(By.text("Chart levels")),10000L));
         click(device,"OK");

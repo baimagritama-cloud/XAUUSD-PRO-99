@@ -83,3 +83,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## Gate 2 — pan bounds verified and label gesture follow-up
 - Run 46013599998 on 82b9f3596744c97e19cccce72ad19c75e7b504f9 passed both orientation tests including pan bounds and overscroll, build/unit tests, background monitoring and calendar notification tests. Artifact 15204843487; visual review pending.
 - Add positive label tap and negative drag/pinch dialog assertions in both orientations, requiring actual chart levels. Explicitly cancel tap eligibility on ACTION_CANCEL. Pending CI.
+
+## Gate 2 — portrait label gesture recovery
+- Run 46019013582 on 43a2f3fa6e6df8e5879fab4d477f4c32f9bff6e7: build/unit and landscape passed; portrait failed at `Chart missing after label drag`; later integration stages not executed. Artifact 15206924695. MainActivity live chart is not nested in a ScrollView. Exact cause not proven from job log alone.
+- Make chart accessibility identity stable at construction instead of resetting it during draw. Wait for native visible/focused chart after dialog dismissal and drag, refresh touch coordinates, retain accessibility assertion and positive/negative dialog checks. Pending CI; no pass claimed.
