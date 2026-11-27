@@ -218,10 +218,20 @@ adb logcat -b all -d -v threadtime > artifacts/diagnostics/stage2-logcat.txt 2>&
 
 echo "STAGE 2 PASSED: Background Monitoring integration assertions completed."
 wait_for_stable_framework stage3
+{
+  echo "=== Installed TTS services ==="
+  adb shell cmd package query-services --brief -a android.intent.action.TTS_SERVICE
+  echo "=== Default TTS engine ==="
+  adb shell settings get secure tts_default_synth
+  echo "=== TTS-related packages ==="
+  adb shell pm list packages | grep -Ei 'tts|speech|pico' || true
+} > artifacts/diagnostics/stage3-tts-engine.txt 2>&1 || true
+cat artifacts/diagnostics/stage3-tts-engine.txt
  echo "STAGE 3: calendar notification and voice safety instrumentation"
 start_live_evidence_capture stage3
 run_orchestrated stage3 calendarNotificationDeliveryAndVoiceSafety
 stop_live_evidence_capture
 adb logcat -b all -d -v threadtime > artifacts/diagnostics/stage3-logcat.txt 2>&1
-echo "STAGE 3 PASSED: notification posting and stale voice suppression; audible output not asserted."
+grep -E "NewsVoiceTest|VoiceEngine.*(Bell requested|TTS requested)" artifacts/diagnostics/stage3-logcat.txt | tail -60 || true
+ echo "STAGE 3 PASSED: notification assertions; inspect TTS readiness and acceptance above; audible output not asserted."
 echo "ALL STAGES PASSED."
