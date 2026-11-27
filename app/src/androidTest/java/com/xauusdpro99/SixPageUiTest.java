@@ -323,11 +323,27 @@ public final class SixPageUiTest {
             java.util.concurrent.atomic.AtomicReference<com.xauusdpro99.voice.VoiceEngine> voice=new java.util.concurrent.atomic.AtomicReference<>();
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->voice.set(new com.xauusdpro99.voice.VoiceEngine(c,status->android.util.Log.i("NewsVoiceTest",status))));
             try{
+                long deadline=android.os.SystemClock.elapsedRealtime()+15000L;
+                while(!voice.get().isReady()&&android.os.SystemClock.elapsedRealtime()<deadline)Thread.sleep(250);
                 String before=c.getSharedPreferences("voice_history",Context.MODE_PRIVATE).getString("entries","");
                 voice.get().speakAlert("NEWS_ALERT","NEWS",Double.NaN,"STALE_TEST_ONLY","INFO",false);
                 Thread.sleep(1000);
                 org.junit.Assert.assertEquals(before,c.getSharedPreferences("voice_history",Context.MODE_PRIVATE).getString("entries",""));
-                android.util.Log.i("NewsVoiceTest","Stale voice suppression verified; TTS status="+voice.get().getStatus()+"; audible output not asserted");
+                android.util.Log.i("NewsVoiceTest","Stale voice suppression checked; TTS status="+voice.get().getStatus());
+                if(voice.get().isReady()){
+                    String marker="FRESH_CPI_TEST_"+now;
+                    voice.get().speakAlert("NEWS_ALERT","NEWS",Double.NaN,marker,"INFO",true);
+                    long until=android.os.SystemClock.elapsedRealtime()+10000L;
+                    boolean accepted=false;
+                    while(android.os.SystemClock.elapsedRealtime()<until){
+                        if(c.getSharedPreferences("voice_history",Context.MODE_PRIVATE).getString("entries","").contains(marker)){accepted=true;break;}
+                        Thread.sleep(200);
+                    }
+                    assertTrue("Fresh news TTS request not accepted",accepted);
+                    android.util.Log.i("NewsVoiceTest","Fresh news TTS accepted; audible output not asserted");
+                }else{
+                    android.util.Log.w("NewsVoiceTest","FRESH TTS NOT VERIFIED: emulator TTS unavailable");
+                }
             }finally{InstrumentationRegistry.getInstrumentation().runOnMainSync(()->voice.get().shutdown());}
         }finally{nm.cancel((int)(id&0x7fffffff));center.close();}
     }
