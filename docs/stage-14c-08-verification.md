@@ -24,3 +24,7 @@ No final APK, no Stage 15, and no item 9 until required gates are verified. Exis
 
 ## Stage 3 evidence — 2026-11-27
 Commit 6f4c0b34923eeb34f3930b9f281404f49ae68483: Android Build run 45917765114 and Emulator UI run 45917765070 succeeded. Logs explicitly report Stage 1 (12 screenshots), Stage 2 (background monitoring), and Stage 3 calendarNotificationDeliveryAndVoiceSafety OK (1 test), ALL STAGES PASSED. Stage 3 checks Android notification posting, duplicate record rejection and stale voice suppression using a controlled fixture. It does not prove real-release dispatch through the service or audible bell/TTS; emulator uses -no-audio. Device acceptance remains open. No feature removal or final APK.
+
+
+## Artifact inspection — UI run 45933315386
+Artifact 15169098867 ZIP inspected directly. Both stage3-logcat.txt and stage3-live/logcat-live.txt report TTS initialization failure at 03:23:38.913 UTC and `FRESH TTS NOT VERIFIED: emulator TTS unavailable` at 03:23:54.944 UTC. Fresh speech acceptance and bell/TTS ordering remain OPEN; stale check occurred with TTS unavailable and is not proof of suppression with a ready engine. Next: inspect TTS package visibility and emulator engine availability, then test deterministic sequencing and real device audio. Do not mark Gate 8 complete.
