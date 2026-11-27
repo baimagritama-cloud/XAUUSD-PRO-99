@@ -78,6 +78,41 @@ def audit():
             if not st['valid']: raise ValueError('No valid rows')
         except Exception as e: st['error']=str(e)
         print(json.dumps(st),flush=True);(out/'report.json').write_text(json.dumps(report,indent=2));time.sleep(1)
+    # Provider reports describe tick gaps, not verified exchange closures.
+    from collections import Counter
+    import bisect
+    intervals=[]; classes=Counter(); malformed=0; duration_mismatch=0
+    for path in sorted(out.glob('provider-metadata-*.txt')):
+        for line in path.read_text(errors='replace').splitlines():
+            if not line.strip().startswith('Gap of'):continue
+            match=re.fullmatch(r'Gap of (\d+)s found between (\d{14}) and (\d{14})\.',line.strip())
+            if not match:malformed+=1;continue
+            try:
+                seconds=int(match[1]); a,b=[datetime.datetime.strptime(x,'%Y%m%d%H%M%S').replace(tzinfo=tz) for x in match.groups()[1:]]
+                if b<=a:raise ValueError()
+            except ValueError:malformed+=1;continue
+            duration=(b-a).total_seconds()
+            if abs(duration-seconds)>1:duration_mismatch+=1
+            kind='UNCLASSIFIED'
+            if a.weekday()==4 and b.weekday()==6 and duration>=86400:kind='POSSIBLE_WEEKEND'
+            elif a.date()==b.date() and a.hour in (15,16,17) and 3300<=duration<=3900:kind='POSSIBLE_DAILY_PAUSE'
+            elif duration<180:kind='SHORT_TICK_GAP'
+            classes[kind]+=1
+            intervals.append((int(a.timestamp())//60*60,int(b.timestamp())//60*60,kind))
+    intervals.sort()
+    starts=[x[0] for x in intervals]; prefix=[]; end=-1
+    for a,b,kind in intervals:end=max(end,b);prefix.append(end)
+    valid_times=sorted(ts for ts in seen if ts not in conflicts)
+    gaps=Counter()
+    for a,b in zip(valid_times,valid_times[1:]):
+        if b-a<=60:continue
+        i=bisect.bisect_left(starts,b)-1
+        gaps['observed']+=1
+        if i>=0 and prefix[i]>a:gaps['overlaps_provider_report']+=1
+        else:gaps['no_report_overlap']+=1
+    report['histdata']['gap_classification']={'classes':dict(classes),'malformed':malformed,'duration_mismatch':duration_mismatch,'ohlc_gaps':dict(gaps),'calendar_verified':False,'note':'Overlap is diagnostic only; no inferred closure is certified.'}
+    print(json.dumps(report['histdata']['gap_classification']),flush=True)
+    if not intervals or malformed:raise ValueError('Missing or malformed provider gap metadata')
     # UTC bucket convention matches CandleTimeframe; observed gaps are not assumed holidays.
     from collections import Counter
     days={}; weeks={}
