@@ -40,7 +40,7 @@ def download_period(year,month=None):
 def audit():
     import time
     now=datetime.datetime.now(datetime.timezone.utc); tz=datetime.timezone(datetime.timedelta(hours=-5))
-    periods=[(y,None) for y in range(now.year-7,now.year)]+[(now.year,m) for m in range(1,now.month)]
+    periods=[(y,None) for y in range(now.year-9,now.year)]+[(now.year,m) for m in range(1,now.month)]
     sizes=(1,2,3,5,15,30,60,240,480,720,1440,10080)
     buckets={m:{} for m in sizes}; conflicts=set(); seen={}; stats=[]
     report['histdata']={'periods':stats}
@@ -173,6 +173,8 @@ def audit():
         quarantine[name]={'observed_closed':len(records),'quarantined':blocked,'pending_calendar':len(records)-blocked,'verified':0,'affected_without_observed_candle':sum(k not in closed for k in reasons)}
         (out/(name+'-quarantine.json')).write_text(json.dumps(records,indent=2))
     report['histdata']['session_quarantine']=quarantine
+    report['histdata']['candidate_coverage_gate']={name:{'target':300,'pending_candidates':q['pending_calendar'],'shortfall':max(0,300-q['pending_calendar']),'candidate_count_pass':q['pending_calendar']>=300,'verified_count_pass':False} for name,q in quarantine.items()}
+    print(json.dumps(report['histdata']['candidate_coverage_gate']),flush=True)
     unknown=[g for g in unmatched if g['candidate']=='UNEXPLAINED_MISSING_MINUTES']
     report['histdata']['unexplained_gap_detail']={'count':len(unknown),'missing_minutes':sum(g['missing_minutes'] for g in unknown),'by_duration':dict(Counter('1-5m' if g['missing_minutes']<=5 else '6-60m' if g['missing_minutes']<=60 else '61-1440m' if g['missing_minutes']<=1440 else 'over_1440m' for g in unknown))}
     print(json.dumps({'session_quarantine':quarantine,'unexplained_gap_detail':report['histdata']['unexplained_gap_detail']}),flush=True)
