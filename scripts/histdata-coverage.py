@@ -49,6 +49,18 @@ def audit():
         try:
             b=download_period(year,month);st['sha256']=hashlib.sha256(b).hexdigest()
             with zipfile.ZipFile(io.BytesIO(b)) as z:
+                # Preserve provider-supplied gap metadata for inspection, never infer holidays.
+                st['archive_members']=[{'name':n,'bytes':z.getinfo(n).file_size} for n in z.namelist()]
+                st['gap_reports']=[]
+                for idx,n in enumerate(z.namelist()):
+                    info=z.getinfo(n)
+                    if n.lower().endswith('.csv') or info.is_dir():continue
+                    if info.file_size>2*1024*1024:continue
+                    raw=z.read(n)
+                    if b'\x00' in raw:continue
+                    dest=out/('provider-metadata-'+str(year)+'-'+str(month or 0)+'-'+str(idx)+'.txt')
+                    dest.write_bytes(raw)
+                    st['gap_reports'].append({'member':n,'artifact':dest.name,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw),'classification':'UNREVIEWED_PROVIDER_METADATA'})
                 for n in z.namelist():
                     if not n.lower().endswith('.csv'): continue
                     if 'XAUUSD' not in n.upper() or z.getinfo(n).file_size>100*1024*1024: raise ValueError('Unexpected CSV')
