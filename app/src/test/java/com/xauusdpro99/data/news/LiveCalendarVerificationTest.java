@@ -10,13 +10,18 @@ public class LiveCalendarVerificationTest {
         EconomicCalendarClient.Response p=EconomicCalendarClient.fetch(EconomicCalendarClient.PRIMARY,"");
         assertTrue(primary.getDetail(),primary.updateJson(p.body,p.source,p.receivedAtMs));
         verifyFields("PRIMARY",primary);
+        verifyPayload(p.body,"events",primary);
         EconomicNewsEngine backup=new EconomicNewsEngine();
+        final String[] fallbackBody={null};
         assertTrue(EconomicCalendarClient.refresh(backup,"","",(url,key)->{
             if(url.equals(EconomicCalendarClient.PRIMARY))throw new IOException("controlled primary outage");
-            return EconomicCalendarClient.fetch(url,key);
+            EconomicCalendarClient.Response response=EconomicCalendarClient.fetch(url,key);
+            fallbackBody[0]=response.body;
+            return response;
         }));
         assertEquals(EconomicCalendarClient.FALLBACK,backup.getSource());
         verifyFields("FALLBACK",backup);
+        verifyPayload(fallbackBody[0],"data",backup);
     }
     private static void verifyFields(String label,EconomicNewsEngine engine) {
         assertEquals(EconomicNewsEngine.DataStatus.LIVE,engine.getDataStatus());
@@ -34,5 +39,28 @@ public class LiveCalendarVerificationTest {
         }
         assertTrue("No recognized impact in "+label,knownImpact>0);
         System.out.println("LIVE "+label+" events="+engine.getEvents().size()+" previous="+previous+" forecast="+forecast+" actual="+actual+" knownImpact="+knownImpact);
+    }
+    private static void verifyPayload(String body,String arrayKey,EconomicNewsEngine engine) {
+        com.google.gson.JsonArray rows=com.google.gson.JsonParser.parseString(body).getAsJsonObject().getAsJsonArray(arrayKey);
+        boolean primary=arrayKey.equals("events");
+        for(EconomicNewsEngine.Event event:engine.getEvents()){
+            com.google.gson.JsonObject match=null;
+            for(com.google.gson.JsonElement row:rows){
+                com.google.gson.JsonObject o=row.getAsJsonObject();
+                String name=o.get(primary?"title":"eventName").getAsString();
+                long time=primary?o.get("ts").getAsLong()*1000L:java.time.Instant.parse(o.get("scheduledAt").getAsString()).toEpochMilli();
+                if(name.equals(event.name)&&time==event.releaseAtMs){match=o;break;}
+            }
+            assertNotNull("Source row missing: "+event.name,match);
+            assertEquals(rawValue(match,"previous"),event.previous);
+            assertEquals(rawValue(match,"forecast"),event.forecast);
+            assertEquals(rawValue(match,"actual"),event.actual);
+            assertEquals(match.get(primary?"impact":"importance").getAsString().toUpperCase(java.util.Locale.US),event.impact.name());
+        }
+    }
+    private static String rawValue(com.google.gson.JsonObject o,String key){
+        if(!o.has(key)||o.get(key).isJsonNull())return null;
+        String s=o.get(key).getAsString().trim();
+        return s.isEmpty()||s.equalsIgnoreCase("null")||s.equalsIgnoreCase("n/a")||s.equals("--")?null:s;
     }
 }
