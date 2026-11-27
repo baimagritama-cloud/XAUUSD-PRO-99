@@ -12,7 +12,7 @@ public class EconomicNewsReactionTest {
         return news.getEvents().get(0);
     }
     private Candle bar(long t,double close,boolean open){
-        return new Candle("XAUUSD",CandleTimeframe.M1,t,2000,Math.max(2000,close)+1,Math.min(2000,close)-1,0,0,open,"test fixture",R+3*M);
+        return new Candle("XAUUSD",CandleTimeframe.M1,t,2000,Math.max(2000,close)+1,Math.min(2000,close)-1,close,0,0,open,"test fixture",R+3*M);
     }
     private CandleEngine.Snapshot snapshot(long now,Candle... bars){
         CandleEngine engine=new CandleEngine(CandleTimeframe.M1);
