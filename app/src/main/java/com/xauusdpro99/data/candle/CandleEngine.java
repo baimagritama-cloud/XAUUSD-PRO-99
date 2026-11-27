@@ -63,7 +63,7 @@ public final class CandleEngine {
         int rejected = 0;
         if (bars != null) {
             for (Candle c : bars) {
-                if (!isValid(c, receivedAtMs)) { rejected++; continue; }
+                if (!isValid(c, receivedAtMs) || c.timeframe != timeframe) { rejected++; continue; }
                 if (c.isOpen) {
                     if (nextRunning == null || c.openTimeMs > nextRunning.openTimeMs) nextRunning = c;
                 } else if (c.isClosedAt(receivedAtMs)) {
@@ -130,7 +130,7 @@ public final class CandleEngine {
                 || !Double.isFinite(c.close) || c.open <= 0 || c.high <= 0 || c.low <= 0 || c.close <= 0) return false;
         if (c.high < c.open || c.high < c.close || c.low > c.open || c.low > c.close || c.high < c.low) return false;
         if (c.openTimeMs <= 0 || c.openTimeMs > nowMs || !c.timeframe.isAligned(c.openTimeMs)) return false;
-        if (c.volume < 0 || c.tickVolume < 0) return false;
+        if (!Double.isFinite(c.volume) || c.volume < 0 || c.tickVolume < 0) return false;
         if (c.isOpen && c.closeTimeMs() <= nowMs) return false;
         if (!c.isOpen && c.closeTimeMs() > nowMs) return false;
         return c.closeTimeMs() > c.openTimeMs;

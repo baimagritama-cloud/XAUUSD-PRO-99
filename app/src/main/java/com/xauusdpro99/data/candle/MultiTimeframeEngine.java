@@ -69,12 +69,12 @@ public final class MultiTimeframeEngine {
             throw new IllegalArgumentException("Hanya M2/M3 yang diagregasi dari M1");
         }
         int groupSize = target == CandleTimeframe.M2 ? 2 : 3;
-        List<Candle> m1 = new ArrayList<>();
+        java.util.TreeMap<Long,Candle> unique = new java.util.TreeMap<>();
         for (Candle c : input) {
             if (c != null && c.timeframe == CandleTimeframe.M1 && !c.isOpen
-                    && c.isClosedAt(nowMs) && CandleEngine.isValid(c, nowMs)) m1.add(c);
+                    && c.isClosedAt(nowMs) && CandleEngine.isValid(c, nowMs)) unique.put(c.openTimeMs,c);
         }
-        m1.sort(Comparator.comparingLong(c -> c.openTimeMs));
+        List<Candle> m1 = new ArrayList<>(unique.values());
         List<Candle> output = new ArrayList<>();
         for (int i = 0; i + groupSize <= m1.size();) {
             Candle first = m1.get(i);
