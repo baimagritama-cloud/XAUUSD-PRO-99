@@ -185,6 +185,7 @@ public final class SixPageUiTest {
         device.waitForIdle();
         exerciseChartDrag(device, chart);
         exerciseChartPanBounds(device);
+        exerciseChartLabelGestures(device);
         click(device, "DETAIL OHLC");
         assertTrue("OHLC detail dialog missing", device.wait(Until.hasObject(By.textContains("OHLC — seluruh timeframe")), 10000L));
         click(device, "TUTUP");
@@ -205,14 +206,14 @@ public final class SixPageUiTest {
     }
 
     private static int[] chartState(){
-        int[] state={-1,-1,-1};
+        int[] state={-1,-1,-1,-1};
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
             for(android.app.Activity activity:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
                     .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED)){
                 android.view.View view=findChart(activity.getWindow().getDecorView());
                 if(view instanceof LiveCandleChartView){
                     LiveCandleChartView chart=(LiveCandleChartView)view;
-                    state[0]=chart.chartClosedCount();state[1]=chart.chartPanBars();state[2]=chart.chartVisibleBars();break;
+                    state[0]=chart.chartClosedCount();state[1]=chart.chartPanBars();state[2]=chart.chartVisibleBars();state[3]=chart.chartLabelCount();break;
                 }
             }
         });
@@ -284,6 +285,33 @@ public final class SixPageUiTest {
             org.junit.Assert.assertEquals("Overscroll changed boundary",older?Math.max(0,s[0]-s[2]):0,s[1]);
         }
         android.util.Log.i("ChartUiTest","Oldest and newest pan bounds verified");
+    }
+
+    private static void exerciseChartLabelGestures(UiDevice device){
+        long deadline=android.os.SystemClock.elapsedRealtime()+45000L;
+        while(chartState()[3]<1 && android.os.SystemClock.elapsedRealtime()<deadline)
+            android.os.SystemClock.sleep(500);
+        assertTrue("Real chart levels required for dialog test",chartState()[3]>0);
+        UiObject2 chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
+        assertTrue("Chart missing for label gestures",chart!=null);
+        android.graphics.Rect b=chart.getVisibleBounds();
+        int x=b.right-Math.max(2,b.width()/20),y=b.centerY();
+        assertTrue("Label tap injection failed",device.click(x,y));
+        assertTrue("Intentional label tap did not open dialog",device.wait(Until.hasObject(By.text("Chart levels")),10000L));
+        click(device,"OK");
+        assertTrue("Label-area drag injection failed",device.swipe(x,y,b.left+b.width()/4,y,25));
+        device.waitForIdle();
+        assertTrue("Drag opened label dialog",!device.hasObject(By.text("Chart levels")));
+        chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
+        assertTrue("Chart missing after label drag",chart!=null);
+        chart.setGestureMargin(Math.max(1,chart.getVisibleBounds().width()/10));
+        chart.pinchOpen(0.75f,400);
+        device.waitForIdle();
+        assertTrue("Pinch opened label dialog",!device.hasObject(By.text("Chart levels")));
+        assertTrue("Label tap after gestures failed",device.click(x,y));
+        assertTrue("Label dialog no longer responds after gestures",device.wait(Until.hasObject(By.text("Chart levels")),10000L));
+        click(device,"OK");
+        android.util.Log.i("ChartUiTest","Label tap, drag and pinch dialog safety verified");
     }
 
     private static void exerciseTimeframes(UiDevice device) {

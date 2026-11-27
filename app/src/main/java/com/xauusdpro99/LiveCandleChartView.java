@@ -49,6 +49,7 @@ public final class LiveCandleChartView extends View {
     }
     // Read-only viewport diagnostics for instrumentation; read on the UI thread.
     private void clampPan(){panBars=Math.max(0,Math.min(Math.max(0,candles.size()-visibleBars),panBars));}
+    int chartLabelCount(){return fullLabels.size();}
     int chartVisibleBars(){return visibleBars;}
     int chartPanBars(){return panBars;}
     int chartClosedCount(){return candles.size();}
@@ -107,6 +108,7 @@ public final class LiveCandleChartView extends View {
         zoom.onTouchEvent(e);
         int action=e.getActionMasked();
         if(action==MotionEvent.ACTION_DOWN){lastX=e.getX();downX=lastX;downY=e.getY();gestureMoved=false;dragRemainder=0;return true;}
+        if(action==MotionEvent.ACTION_CANCEL){gestureMoved=true;dragRemainder=0;return true;}
         if(action==MotionEvent.ACTION_POINTER_DOWN){gestureMoved=true;return true;}
         if(action==MotionEvent.ACTION_POINTER_UP){lastX=e.getX(e.getActionIndex()==0?1:0);dragRemainder=0;return true;}
         if(action==MotionEvent.ACTION_MOVE){if(Math.abs(e.getX()-downX)>=dp(8)||Math.abs(e.getY()-downY)>=dp(8))gestureMoved=true;float dx=e.getX()-lastX;lastX=e.getX();if(!zoom.isInProgress()&&e.getPointerCount()==1&&!candles.isEmpty()){dragRemainder+=dx/Math.max(1,(getWidth()-Math.min(dp(156),getWidth()*.40f)-dp(6))/Math.min(visibleBars,candles.size()));int shift=(int)dragRemainder;dragRemainder-=shift;panBars+=shift;clampPan();invalidate();}return true;}

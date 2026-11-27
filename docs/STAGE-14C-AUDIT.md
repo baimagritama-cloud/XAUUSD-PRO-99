@@ -79,3 +79,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## Gate 2 — pinch verified and pan bounds follow-up
 - Run 46011159144 on 0524b3395f66840eb2251a51a919c968b3b2e7da passed both orientation tests including pinch assertions, build/unit tests, background monitoring and calendar notification tests; artifact 15203674262. Visual review pending.
 - Fix pan clamp to max(0, closed count - visible bars), including after scale changes and data refresh. Test both boundaries and overscroll in both orientations. Drag regression now runs zoomed in because a full-history viewport correctly cannot pan. Pending CI.
+
+## Gate 2 — pan bounds verified and label gesture follow-up
+- Run 46013599998 on 82b9f3596744c97e19cccce72ad19c75e7b504f9 passed both orientation tests including pan bounds and overscroll, build/unit tests, background monitoring and calendar notification tests. Artifact 15204843487; visual review pending.
+- Add positive label tap and negative drag/pinch dialog assertions in both orientations, requiring actual chart levels. Explicitly cancel tap eligibility on ACTION_CANCEL. Pending CI.
