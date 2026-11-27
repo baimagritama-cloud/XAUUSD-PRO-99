@@ -21,3 +21,6 @@ No final APK, no Stage 15, and no item 9 until required gates are verified. Exis
 - Probe #2 run 45887861415 failed during Gradle classpath dependency resolution (kotlin-stdlib-jdk8:1.9.20), before calendar test execution. Subsequent probe passed.
 - HEAD ed93b77907eb516830d8c0d11764d0d2b49e068e: build 45901327491 and emulator 45901327480 passed, unit test task successful, 12 screenshots and background monitoring assertions confirmed in logs.
 - Remaining: device-level calendar notification delivery and audible bell/TTS evidence. Gate 8 remains OPEN. No claim of physical audio verification.
+
+## Stage 3 evidence — 2026-11-27
+Commit 6f4c0b34923eeb34f3930b9f281404f49ae68483: Android Build run 45917765114 and Emulator UI run 45917765070 succeeded. Logs explicitly report Stage 1 (12 screenshots), Stage 2 (background monitoring), and Stage 3 calendarNotificationDeliveryAndVoiceSafety OK (1 test), ALL STAGES PASSED. Stage 3 checks Android notification posting, duplicate record rejection and stale voice suppression using a controlled fixture. It does not prove real-release dispatch through the service or audible bell/TTS; emulator uses -no-audio. Device acceptance remains open. No feature removal or final APK.
