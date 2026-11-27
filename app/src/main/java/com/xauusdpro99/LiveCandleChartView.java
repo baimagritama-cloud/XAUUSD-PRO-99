@@ -61,9 +61,16 @@ public final class LiveCandleChartView extends View {
         if(Double.isFinite(support))min=Math.min(min,support);if(Double.isFinite(resistance))max=Math.max(max,resistance);
         double pad=Math.max((max-min)*.08,.01);min-=pad;max+=pad;final double range=max-min;
         for(int i=0;i<5;i++){double v=max-range*i/4d;float y=map(v,min,max,top,bottom);p.setColor(0xFF9AA9BC);p.setTextSize(dp(10));c.drawText(String.format(Locale.US,"%.2f",v),right+dp(3),y+dp(3),p);}
-        for(Zone z:zones){float y1=map(z.upper,min,max,top,bottom),y2=map(z.lower,min,max,top,bottom);p.setColor(z.demand?0x3320A8FF:0x33FF5268);c.drawRect(left,Math.min(y1,y2),right,Math.max(y1,y2),p);p.setColor(z.demand?0xFF55B8FF:0xFFFF7888);label(c,String.format(Locale.US,"%s %.2f–%.2f",z.label==null?(z.demand?"DEMAND":"SUPPLY"):z.label,z.lower,z.upper),right+dp(52),Math.min(y1,y2)+dp(10),top,bottom);}
+        // Paint all zones first, then reserve label rows for S/R and both zone directions.
+        for(Zone z:zones){float y1=map(z.upper,min,max,top,bottom),y2=map(z.lower,min,max,top,bottom);p.setColor(z.demand?0x3320A8FF:0x33FF5268);c.drawRect(left,Math.min(y1,y2),right,Math.max(y1,y2),p);}
         if(Double.isFinite(resistance))level(c,left,right,map(resistance,min,max,top,bottom),0xFFFF6677,"R "+String.format(Locale.US,"%.2f",resistance),top,bottom);
         if(Double.isFinite(support))level(c,left,right,map(support,min,max,top,bottom),0xFF55B8FF,"S "+String.format(Locale.US,"%.2f",support),top,bottom);
+        List<Zone> demandZones=new ArrayList<>(), supplyZones=new ArrayList<>();
+        for(Zone z:zones)(z.demand?demandZones:supplyZones).add(z);
+        for(int i=0;i<Math.max(demandZones.size(),supplyZones.size());i++){
+            if(i<supplyZones.size())zoneLabel(c,supplyZones.get(i),right,min,max,top,bottom);
+            if(i<demandZones.size())zoneLabel(c,demandZones.get(i),right,min,max,top,bottom);
+        }
         float step=plotW/Math.max(1,(end-start));float body=Math.max(0.5f,Math.min(8f,step*.62f));
         for(int i=start;i<end;i++){Candle b=candles.get(i);float x=left+(i-start+.5f)*step;float yh=map(b.high,min,max,top,bottom),yl=map(b.low,min,max,top,bottom),yo=map(b.open,min,max,top,bottom),yc=map(b.close,min,max,top,bottom);int color=b.close>=b.open?up:down;p.setColor(color);p.setStrokeWidth(1.2f);c.drawLine(x,yh,x,yl,p);p.setStyle(Paint.Style.FILL);c.drawRect(x-body/2,Math.min(yo,yc),x+body/2,Math.max(Math.max(yo,yc),Math.min(yo,yc)+1),p);}
         c.save();c.clipRect(left,top,right,bottom);drawEma(c,start,end,left,step,min,max,top,bottom);c.restore();
@@ -76,10 +83,19 @@ public final class LiveCandleChartView extends View {
         p.setColor(0xFFFFD166);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.5f);c.drawPath(path,p);p.setStyle(Paint.Style.FILL);
     }
     private void level(Canvas c,float l,float r,float y,int color,String label,float top,float bottom){p.setColor(color);p.setStrokeWidth(1.2f);p.setStyle(Paint.Style.STROKE);c.drawLine(l,y,r,y,p);p.setStyle(Paint.Style.FILL);label(c,label,r+dp(52),y,top,bottom);}
+    private void zoneLabel(Canvas c,Zone z,float right,double min,double max,float top,float bottom){
+        p.setColor(z.demand?0xFF55B8FF:0xFFFF7888);
+        String full=String.format(Locale.US,"%s %.2f–%.2f",z.label==null?(z.demand?"DEMAND":"SUPPLY"):z.label,z.lower,z.upper);
+        String compact=String.format(Locale.US,"%s %.2f",z.demand?"D":"S",z.demand?z.upper:z.lower);
+        label(c,full,compact,right+dp(52),map(z.upper,min,max,top,bottom)+dp(10),top,bottom);
+    }
     private void label(Canvas c,String value,float x,float desired,float top,float bottom){
+        label(c,value,value,x,desired,top,bottom);
+    }
+    private void label(Canvas c,String value,String compact,float x,float desired,float top,float bottom){
         if(value==null)return;fullLabels.add(value);p.setTextSize(dp(9));float spacing=dp(12),best=Float.NaN,dist=Float.MAX_VALUE;
         for(float y=top+dp(9);y<=bottom;y+=spacing){boolean free=true;for(float used:labelRows)if(Math.abs(used-y)<spacing*.9f){free=false;break;}if(free&&Math.abs(y-desired)<dist){best=y;dist=Math.abs(y-desired);}}
-        if(Float.isNaN(best)){omittedLabels++;return;}labelRows.add(best);float width=getWidth()-x-dp(2);String t=value;if(p.measureText(t)>width){while(t.length()>0&&p.measureText(t+"…")>width)t=t.substring(0,t.length()-1);t=t+"…";}c.drawText(t,x,best,p);
+        if(Float.isNaN(best)){omittedLabels++;return;}labelRows.add(best);float width=getWidth()-x-dp(2);String t=p.measureText(value)<=width?value:compact;if(p.measureText(t)>width){while(t.length()>0&&p.measureText(t+"…")>width)t=t.substring(0,t.length()-1);t=t+"…";}c.drawText(t,x,best,p);
     }
     private float map(double v,double min,double max,float top,float bottom){return bottom-(float)((v-min)/(max-min))*(bottom-top);}
     @Override public boolean onTouchEvent(MotionEvent e){

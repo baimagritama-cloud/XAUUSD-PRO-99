@@ -61,3 +61,6 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## Gate 2 — landscape viewport follow-up
 - Run 45985394260, job 140459583254, tested 20968144e1ae6940d6f498240c75d7363647d97f successfully: unit/build, four instrumentation invocations, twelve screenshots, monitoring and notification assertions. Fresh TTS accepted; audible output not asserted. Artifact 15190484344; latest visual inspection pending.
 - Combine refresh controls and horizontally scrollable timeframe selector into one 40dp row in landscape, preserving every button and handler. Portrait unchanged. Expected gain 40dp of chart height; actual viewport and button accessibility pending CI and screenshots. Gate 2 remains open.
+
+## Gate 2 — label allocation follow-up
+- Run 45987138479 tested ea5a9662682ec1de5b0b4f0a5e2b75424e3e3633 successfully; twelve screenshots captured, artifact 15191344865. Prioritize support/resistance labels, alternate supply/demand label allocation, and use compact price labels when full zone text does not fit. Full zone bounds remain in the level dialog. All zone fills retained. CI and visual confirmation pending; gate remains open.
