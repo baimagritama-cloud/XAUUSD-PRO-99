@@ -152,6 +152,30 @@ def audit():
         closed={k:g for k,g in groups.items() if k+step<=now.timestamp() and g['observed']}
         session[name]={'closed_observed':len(closed),'conflict_free':sum(not g['conflicts'] for g in closed.values()),'with_internal_gaps':sum(g['internal_missing']>0 for g in closed.values()),'weekday_counts':dict(Counter(datetime.datetime.fromtimestamp(k,datetime.timezone.utc).strftime('%A') for k in closed)),'calendar_verified':False,'status':'UNVERIFIED_SESSION_CALENDAR'}
         (out/(name+'-sessions.json')).write_text(json.dumps(closed))
+    # Conservative session quarantine; a clean candidate is not a verified candle.
+    quarantine={}
+    for name,groups,step,offset in [('D1',days,86400,0),('W1',weeks,604800,259200)]:
+        reasons={}
+        def mark(k,reason):
+            reasons.setdefault(k,set()).add(reason)
+        for ts in conflicts:mark((ts+offset)//step*step-offset,'CONFLICTING_M1')
+        for gap in unmatched:
+            if gap['candidate'] not in ('UNEXPLAINED_MISSING_MINUTES','MIXED_CONFLICT_AND_MISSING'):continue
+            a=gap['previous_utc']+60;b=gap['next_utc']-60
+            first=(a+offset)//step*step-offset;last=(b+offset)//step*step-offset
+            for k in range(first,last+1,step):mark(k,'UNEXPLAINED_GAP')
+        closed={k:g for k,g in groups.items() if k+step<=now.timestamp() and g['observed']}
+        records=[]
+        for k,g in sorted(closed.items()):
+            why=sorted(reasons.get(k,set()))
+            records.append({'start_utc':k,'observed_minutes':g['observed'],'internal_missing':g['internal_missing'],'reasons':why,'status':'QUARANTINED' if why else 'PENDING_CALENDAR_VERIFICATION'})
+        blocked=sum(x['status']=='QUARANTINED' for x in records)
+        quarantine[name]={'observed_closed':len(records),'quarantined':blocked,'pending_calendar':len(records)-blocked,'verified':0,'affected_without_observed_candle':sum(k not in closed for k in reasons)}
+        (out/(name+'-quarantine.json')).write_text(json.dumps(records,indent=2))
+    report['histdata']['session_quarantine']=quarantine
+    unknown=[g for g in unmatched if g['candidate']=='UNEXPLAINED_MISSING_MINUTES']
+    report['histdata']['unexplained_gap_detail']={'count':len(unknown),'missing_minutes':sum(g['missing_minutes'] for g in unknown),'by_duration':dict(Counter('1-5m' if g['missing_minutes']<=5 else '6-60m' if g['missing_minutes']<=60 else '61-1440m' if g['missing_minutes']<=1440 else 'over_1440m' for g in unknown))}
+    print(json.dumps({'session_quarantine':quarantine,'unexplained_gap_detail':report['histdata']['unexplained_gap_detail']}),flush=True)
     report['histdata']['session_audit']=session
     expected=sum(st['valid'] for st in stats)-len(conflicts)
     actual=len(seen)-len(conflicts)
