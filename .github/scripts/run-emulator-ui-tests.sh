@@ -156,6 +156,16 @@ run_orchestrated() {
   grep -Eq 'OK \(1 test\)|Tests found: 1,[[:space:]]*Tests run: 1,[[:space:]]*Failures: 0' "$output"
 }
 
+# Collect TTS availability before any UI assertion can abort the run.
+{
+  adb shell wm size
+  adb shell wm density
+  adb shell cmd package query-services --brief -a android.intent.action.TTS_SERVICE
+  adb shell settings get secure tts_default_synth
+  adb shell pm list packages | grep -Ei 'tts|speech|pico' || true
+} > artifacts/diagnostics/pre-ui-tts-and-display.txt 2>&1 || true
+cat artifacts/diagnostics/pre-ui-tts-and-display.txt
+
 # Stage 1: independently test both orientations.
 echo "STAGE 1/2: six-page landscape UI test"
 start_live_evidence_capture stage1
