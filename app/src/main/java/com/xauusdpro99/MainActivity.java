@@ -147,6 +147,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         LinearLayout nav=new LinearLayout(this);nav.setOrientation(LinearLayout.HORIZONTAL);
         android.widget.HorizontalScrollView navScroll=new android.widget.HorizontalScrollView(this);
         navScroll.setHorizontalScrollBarEnabled(false);
+        navScroll.setContentDescription("MAIN_PAGE_NAVIGATION");
         String[] pageNames={"LIVE CHART","MARKET JOURNEY","INDICATOR CENTER","SIGNAL CENTER","NEWS","NOTIFICATIONS"};
         for(int i=0;i<pageNames.length;i++){final int page=i;Button n=new Button(this);n.setText(pageNames[i]);n.setTextSize(10);styleCompactButton(n);n.setMinWidth(0);n.setPadding(dp(8),0,dp(8),0);n.setOnClickListener(v->showPage(page));nav.addView(n,new LinearLayout.LayoutParams(-2,dp(40)));}
         navScroll.addView(nav);root.addView(navScroll,matchWrap());
