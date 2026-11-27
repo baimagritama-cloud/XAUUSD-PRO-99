@@ -307,6 +307,25 @@ public final class SixPageUiTest {
         throw new AssertionError("Native chart not visible/focused after gesture or dialog; bounds="+bounds+"; foreground="+device.getCurrentPackageName());
     }
 
+    private static int safeLabelGestureX(android.graphics.Rect b){
+        int[] x={-1};
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+            for(android.app.Activity a:androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED)){
+                android.view.View v=findChart(a.getWindow().getDecorView());
+                if(v==null)continue;
+                float density=v.getResources().getDisplayMetrics().density;
+                int edge=android.os.Build.VERSION.SDK_INT>=29 && v.getRootWindowInsets()!=null?v.getRootWindowInsets().getSystemGestureInsets().right:0;
+                int left=b.right-(int)Math.min(156*density,v.getWidth()*.40f)+(int)(4*density);
+                int right=Math.min(b.right,a.getWindow().getDecorView().getWidth()-edge)-(int)(12*density);
+                if(right>left)x[0]=(left+right)/2;
+                android.util.Log.i("ChartUiTest","Safe label x="+x[0]+" inset="+edge+" bounds="+b);
+                break;
+            }
+        });
+        assertTrue("No safe label coordinate outside Android BACK inset",x[0]>=0);
+        return x[0];
+    }
+
     private static void exerciseChartLabelGestures(UiDevice device){
         long deadline=android.os.SystemClock.elapsedRealtime()+45000L;
         while(chartState()[3]<1 && android.os.SystemClock.elapsedRealtime()<deadline)
@@ -315,14 +334,15 @@ public final class SixPageUiTest {
         UiObject2 chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
         assertTrue("Chart missing for label gestures",chart!=null);
         android.graphics.Rect b=chart.getVisibleBounds();
-        int x=b.right-Math.max(2,b.width()/20),y=b.centerY();
+        int x=safeLabelGestureX(b),y=b.centerY();
         assertTrue("Label tap injection failed",device.click(x,y));
         assertTrue("Intentional label tap did not open dialog",device.wait(Until.hasObject(By.text("Chart levels")),10000L));
         click(device,"OK");
         b=awaitNativeChartBounds(device);
-        x=b.right-Math.max(2,b.width()/20);y=b.centerY();
+        x=safeLabelGestureX(b);y=b.centerY();
         assertTrue("Label-area drag injection failed",device.swipe(x,y,b.left+b.width()/4,y,25));
         device.waitForIdle();
+        assertTrue("Label drag left app foreground","com.xauusdpro99".equals(device.getCurrentPackageName()));
         assertTrue("Drag opened label dialog",!device.hasObject(By.text("Chart levels")));
         b=awaitNativeChartBounds(device);
         chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),20000L);
@@ -332,7 +352,7 @@ public final class SixPageUiTest {
         device.waitForIdle();
         assertTrue("Pinch opened label dialog",!device.hasObject(By.text("Chart levels")));
         b=awaitNativeChartBounds(device);
-        x=b.right-Math.max(2,b.width()/20);y=b.centerY();
+        x=safeLabelGestureX(b);y=b.centerY();
         assertTrue("Label tap after gestures failed",device.click(x,y));
         assertTrue("Label dialog no longer responds after gestures",device.wait(Until.hasObject(By.text("Chart levels")),10000L));
         click(device,"OK");
