@@ -157,17 +157,18 @@ public final class SixPageUiTest {
         File debug = new File(output, "debug");
         if (!debug.exists()) debug.mkdirs();
         for (String page : PAGES) {
-            UiObject2 nav = waitForText(device, page, 10_000L);
-            if (nav == null) {
-                int y = Math.max(20, device.getDisplayHeight() / 12);
-                device.swipe(device.getDisplayWidth() - 40, y, 40, y, 25);
-                device.waitForIdle();
-                nav = waitForText(device, page, 3_000L);
-                if (nav == null) {
-                    device.swipe(40, y, device.getDisplayWidth() - 40, y, 25);
-                    device.waitForIdle();
-                    nav = waitForText(device, page, 3_000L);
-                }
+            UiObject2 nav = waitForText(device, page, 3_000L);
+            for (int attempt = 0; nav == null && attempt < 12; attempt++) {
+                UiObject2 strip = device.wait(Until.findObject(By.desc("MAIN_PAGE_NAVIGATION")), 5_000L);
+                assertTrue("Main navigation strip missing", strip != null);
+                android.graphics.Rect bounds = strip.getVisibleBounds();
+                int left = bounds.left + bounds.width()/8;
+                int right = bounds.right - bounds.width()/8;
+                int y = bounds.centerY();
+                if (attempt < 6) device.swipe(right, y, left, y, 25);
+                else device.swipe(left, y, right, y, 25);
+                device.waitForIdle(2_000L);
+                nav = waitForText(device, page, 1_500L);
             }
             if (nav == null) {
                 device.takeScreenshot(new File(debug, orientation + "_missing_" + page.replace(' ', '_') + ".png"));
