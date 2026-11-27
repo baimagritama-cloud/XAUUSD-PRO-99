@@ -28,3 +28,7 @@ Commit 6f4c0b34923eeb34f3930b9f281404f49ae68483: Android Build run 45917765114 a
 
 ## Artifact inspection — UI run 45933315386
 Artifact 15169098867 ZIP inspected directly. Both stage3-logcat.txt and stage3-live/logcat-live.txt report TTS initialization failure at 03:23:38.913 UTC and `FRESH TTS NOT VERIFIED: emulator TTS unavailable` at 03:23:54.944 UTC. Fresh speech acceptance and bell/TTS ordering remain OPEN; stale check occurred with TTS unavailable and is not proof of suppression with a ready engine. Next: inspect TTS package visibility and emulator engine availability, then test deterministic sequencing and real device audio. Do not mark Gate 8 complete.
+
+
+## Verified Google TTS integration — 2026-11-27
+Commit 7297501e5b09bc1767eeb551dd4d6509cf652460: Build 45953090810 and UI 45953090924 SUCCESS. Job logs show GoogleTtsService installed, TTS ready using device language (Indonesian voice unavailable), stale suppression checked at 06:44:51.267 UTC, bell accepted at 06:44:51.270, TTS requested at 06:44:51.751 (481 ms later), fresh speech accepted at 06:44:51.868. All three stages passed, including 12 screenshots and background monitoring. Audible output and Indonesian female voice remain unverified; emulator uses -no-audio. Gate 8 remains open pending provider field/release verification and device audio validation.
