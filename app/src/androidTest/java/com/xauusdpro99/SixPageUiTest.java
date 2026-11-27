@@ -282,6 +282,13 @@ public final class SixPageUiTest {
             }
             assertTrue("Android notification not posted",found);
             assertTrue("Duplicate alert was recorded",center.recordAlert(title,"duplicate",now,now,0)<0);
+            long releaseTime=now+7200000L;
+            String cpi=title+" — CPI — "+releaseTime;
+            String nfp=title+" — NFP — "+releaseTime;
+            assertTrue(center.recordAlert(cpi,"TEST ONLY",releaseTime,now,300000L)>0);
+            assertTrue("Different event suppressed by cooldown",center.recordAlert(nfp,"TEST ONLY",releaseTime,now,300000L)>0);
+            assertTrue("Same event repeated",center.recordAlert(cpi,"TEST ONLY",releaseTime,now+1000L,300000L)<0);
+            assertTrue("Next milestone suppressed",center.recordAlert(cpi+" — 45 minutes","TEST ONLY",releaseTime,now+4500000L,300000L)>0);
             java.util.concurrent.atomic.AtomicReference<com.xauusdpro99.voice.VoiceEngine> voice=new java.util.concurrent.atomic.AtomicReference<>();
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->voice.set(new com.xauusdpro99.voice.VoiceEngine(c,status->android.util.Log.i("NewsVoiceTest",status))));
             try{
