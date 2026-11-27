@@ -66,6 +66,26 @@ def audit():
             if not st['valid']: raise ValueError('No valid rows')
         except Exception as e: st['error']=str(e)
         print(json.dumps(st),flush=True);(out/'report.json').write_text(json.dumps(report,indent=2));time.sleep(1)
+    # UTC bucket convention matches CandleTimeframe; observed gaps are not assumed holidays.
+    from collections import Counter
+    days={}; weeks={}
+    for ts in sorted(seen):
+        day=ts//86400*86400; week=(ts+3*86400)//604800*604800-3*86400
+        for group,key in ((days,day),(weeks,week)):
+            g=group.setdefault(key,{'observed':0,'conflicts':0,'first':None,'last':None,'internal_missing':0})
+            if ts in conflicts: g['conflicts']+=1;continue
+            if g['last'] is not None:g['internal_missing']+=(ts-g['last'])//60-1
+            if g['first'] is None:g['first']=ts
+            g['last']=ts;g['observed']+=1
+    session={}
+    for name,groups,step in [('D1',days,86400),('W1',weeks,604800)]:
+        closed={k:g for k,g in groups.items() if k+step<=now.timestamp() and g['observed']}
+        session[name]={'closed_observed':len(closed),'conflict_free':sum(not g['conflicts'] for g in closed.values()),'with_internal_gaps':sum(g['internal_missing']>0 for g in closed.values()),'weekday_counts':dict(Counter(datetime.datetime.fromtimestamp(k,datetime.timezone.utc).strftime('%A') for k in closed)),'calendar_verified':False,'status':'UNVERIFIED_SESSION_CALENDAR'}
+        (out/(name+'-sessions.json')).write_text(json.dumps(closed))
+    report['histdata']['session_audit']=session
+    expected=sum(st['valid'] for st in stats)-len(conflicts)
+    actual=len(seen)-len(conflicts)
+    report['histdata']['reconciliation']={'sum_period_unique_minus_conflicts':expected,'actual_unique':actual,'matches':expected==actual}
     for ts in sorted(seen):
         if ts in conflicts: continue
         o,h,l,c=seen[ts]
@@ -81,5 +101,13 @@ def audit():
         result[str(m)]={'complete':complete,'observed_nonempty':len(groups),'partial':len(groups)-complete,'session_calendar_verified':False}
     report['histdata'].update(unique_valid=len(seen)-len(conflicts),conflicting_timestamps=len(conflicts),counts=result,first_utc=min(seen,default=None),last_utc=max(seen,default=None))
     (out/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
+    checks={}
+    for m,groups in buckets.items():
+        q=result[str(m)]
+        eligible=sum(1 for ts in seen if ts not in conflicts and ((ts+(3*86400 if m==10080 else 0))//(m*60)+1)*(m*60)-(3*86400 if m==10080 else 0)<=now.timestamp())
+        checks[str(m)]={'bucket_rows':sum(g[0] for g in groups.values()),'eligible_rows':eligible,'matches':sum(g[0] for g in groups.values())==eligible and q['complete']+q['partial']==q['observed_nonempty']}
+    report['histdata']['bucket_reconciliation']=checks
+    (out/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps({'session_audit':session,'reconciliation':report['histdata']['reconciliation'],'bucket_reconciliation':checks},indent=2))
+    if expected!=actual or not all(q['matches'] for q in checks.values()):raise SystemExit(1)
     if any('error' in st or st['invalid'] for st in stats) or any(result[str(m)]['complete']<300 for m in sizes if m<1440) or any(result[str(m)]['observed_nonempty']<300 for m in (1440,10080)):raise SystemExit(1)
 audit()
