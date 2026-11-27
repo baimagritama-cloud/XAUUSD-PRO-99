@@ -177,8 +177,14 @@ public final class SixPageUiTest {
         assertTrue("EMA selection did not change", device.wait(Until.hasObject(By.text("EMA: 10")), 10000L));
         UiObject2 chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
         assertTrue("Chart missing or too short", chart!=null && chart.getVisibleBounds().height() >= device.getDisplayHeight()/6);
-        exerciseChartDrag(device, chart);
         exerciseChartPinch(device);
+        chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
+        assertTrue("Chart missing before zoomed drag",chart!=null);
+        chart.setGestureMargin(Math.max(1,chart.getVisibleBounds().width()/10));
+        chart.pinchOpen(0.85f,400);
+        device.waitForIdle();
+        exerciseChartDrag(device, chart);
+        exerciseChartPanBounds(device);
         click(device, "DETAIL OHLC");
         assertTrue("OHLC detail dialog missing", device.wait(Until.hasObject(By.textContains("OHLC — seluruh timeframe")), 10000L));
         click(device, "TUTUP");
@@ -253,6 +259,31 @@ public final class SixPageUiTest {
         assertTrue("Pinch close did not zoom out: "+enlarged[2]+" -> "+reduced[2],reduced[2]>enlarged[2]);
         assertTrue("Zoom above maximum",reduced[2]<=300);
         android.util.Log.i("ChartUiTest","Pinch viewport verified: "+before[2]+" -> "+enlarged[2]+" -> "+reduced[2]);
+    }
+
+    private static void exerciseChartPanBounds(UiDevice device){
+        UiObject2 chart=device.wait(Until.findObject(By.desc("LIVE_CANDLE_CHART")),10000L);
+        assertTrue("Chart missing for pan bounds",chart!=null);
+        android.graphics.Rect b=chart.getVisibleBounds();
+        int left=b.left+b.width()/10,right=b.left+b.width()/2,y=b.centerY();
+        int[] initial=chartState();
+        assertTrue("Need zoomed viewport for pan boundary test",initial[0]>initial[2]);
+        for(int direction=0;direction<2;direction++){
+            boolean older=direction==0;
+            boolean reached=false;
+            for(int i=0;i<80;i++){
+                assertTrue("Boundary swipe failed",device.swipe(older?left:right,y,older?right:left,y,12));
+                int[] s=chartState();
+                int max=Math.max(0,s[0]-s[2]);
+                assertTrue("Pan outside viewport bounds",s[1]>=0&&s[1]<=max);
+                if(s[1]==(older?max:0)){reached=true;break;}
+            }
+            assertTrue("Could not reach "+(older?"oldest":"newest")+" boundary",reached);
+            assertTrue("Overscroll swipe failed",device.swipe(older?left:right,y,older?right:left,y,12));
+            int[] s=chartState();
+            org.junit.Assert.assertEquals("Overscroll changed boundary",older?Math.max(0,s[0]-s[2]):0,s[1]);
+        }
+        android.util.Log.i("ChartUiTest","Oldest and newest pan bounds verified");
     }
 
     private static void exerciseTimeframes(UiDevice device) {

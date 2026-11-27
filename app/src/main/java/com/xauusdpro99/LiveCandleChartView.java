@@ -40,14 +40,15 @@ public final class LiveCandleChartView extends View {
     private int omittedLabels;
     private final List<String> fullLabels=new ArrayList<>();
     private final int bg=0xFF0B1220, grid=0xFF263244, up=0xFF20C997, down=0xFFFF5C70;
-    public LiveCandleChartView(Context c){super(c);setBackgroundColor(bg);setMinimumHeight((int)dp(100));zoom=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){@Override public boolean onScale(ScaleGestureDetector d){visibleBars=Math.max(10,Math.min(300,Math.round(visibleBars/d.getScaleFactor())));invalidate();return true;}});}
+    public LiveCandleChartView(Context c){super(c);setBackgroundColor(bg);setMinimumHeight((int)dp(100));zoom=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){@Override public boolean onScale(ScaleGestureDetector d){visibleBars=Math.max(10,Math.min(300,Math.round(visibleBars/d.getScaleFactor())));clampPan();invalidate();return true;}});}
     public void setData(List<Candle> data,List<Zone> z,String tf,double s,double r){
         candles=data==null?Collections.emptyList():new ArrayList<>(data);
         zones=z==null?Collections.emptyList():new ArrayList<>(z);
-        String next=tf==null?"--":tf;if(!next.equals(timeframe))panBars=0;timeframe=next;panBars=Math.min(panBars,Math.max(0,candles.size()-1));support=s;resistance=r;
+        String next=tf==null?"--":tf;if(!next.equals(timeframe))panBars=0;timeframe=next;clampPan();support=s;resistance=r;
         invalidate();
     }
     // Read-only viewport diagnostics for instrumentation; read on the UI thread.
+    private void clampPan(){panBars=Math.max(0,Math.min(Math.max(0,candles.size()-visibleBars),panBars));}
     int chartVisibleBars(){return visibleBars;}
     int chartPanBars(){return panBars;}
     int chartClosedCount(){return candles.size();}
@@ -108,7 +109,7 @@ public final class LiveCandleChartView extends View {
         if(action==MotionEvent.ACTION_DOWN){lastX=e.getX();downX=lastX;downY=e.getY();gestureMoved=false;dragRemainder=0;return true;}
         if(action==MotionEvent.ACTION_POINTER_DOWN){gestureMoved=true;return true;}
         if(action==MotionEvent.ACTION_POINTER_UP){lastX=e.getX(e.getActionIndex()==0?1:0);dragRemainder=0;return true;}
-        if(action==MotionEvent.ACTION_MOVE){if(Math.abs(e.getX()-downX)>=dp(8)||Math.abs(e.getY()-downY)>=dp(8))gestureMoved=true;float dx=e.getX()-lastX;lastX=e.getX();if(!zoom.isInProgress()&&e.getPointerCount()==1&&!candles.isEmpty()){dragRemainder+=dx/Math.max(1,(getWidth()-Math.min(dp(156),getWidth()*.40f)-dp(6))/Math.min(visibleBars,candles.size()));int shift=(int)dragRemainder;dragRemainder-=shift;panBars=Math.max(0,Math.min(candles.size()-1,panBars+shift));invalidate();}return true;}
+        if(action==MotionEvent.ACTION_MOVE){if(Math.abs(e.getX()-downX)>=dp(8)||Math.abs(e.getY()-downY)>=dp(8))gestureMoved=true;float dx=e.getX()-lastX;lastX=e.getX();if(!zoom.isInProgress()&&e.getPointerCount()==1&&!candles.isEmpty()){dragRemainder+=dx/Math.max(1,(getWidth()-Math.min(dp(156),getWidth()*.40f)-dp(6))/Math.min(visibleBars,candles.size()));int shift=(int)dragRemainder;dragRemainder-=shift;panBars+=shift;clampPan();invalidate();}return true;}
         if(action==MotionEvent.ACTION_UP&&!gestureMoved&&Math.abs(e.getX()-downX)<dp(8)&&Math.abs(e.getY()-downY)<dp(8)&&downX>getWidth()-Math.min(dp(156),getWidth()*.40f)&&!fullLabels.isEmpty()){performClick();new android.app.AlertDialog.Builder(getContext()).setTitle("Chart levels").setMessage(android.text.TextUtils.join("\n",fullLabels)).setPositiveButton("OK",null).show();}
         return true;
     }

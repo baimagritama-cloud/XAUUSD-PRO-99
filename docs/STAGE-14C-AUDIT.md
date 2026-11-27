@@ -75,3 +75,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## Gate 2 — drag verified and pinch follow-up
 - Run 46003335428 on 24853e0b68bbcd173878104b0d040f5a116ae7b2, job 140520253896, passed both orientation tests including bidirectional drag assertions, build/unit tests, background monitoring and calendar notification tests. Twelve screenshots captured; artifact 15199493448; visual review pending.
 - Add pinch open/close assertions in both orientations using read-only viewport scale, requiring real closed candles. Pending CI. No trading engine changes.
+
+## Gate 2 — pinch verified and pan bounds follow-up
+- Run 46011159144 on 0524b3395f66840eb2251a51a919c968b3b2e7da passed both orientation tests including pinch assertions, build/unit tests, background monitoring and calendar notification tests; artifact 15203674262. Visual review pending.
+- Fix pan clamp to max(0, closed count - visible bars), including after scale changes and data refresh. Test both boundaries and overscroll in both orientations. Drag regression now runs zoomed in because a full-history viewport correctly cannot pan. Pending CI.
