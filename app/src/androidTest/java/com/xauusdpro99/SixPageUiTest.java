@@ -291,8 +291,8 @@ public final class SixPageUiTest {
             assertTrue("Next milestone suppressed",center.recordAlert(cpi+" — 45 minutes","TEST ONLY",releaseTime,now+4500000L,300000L)>0);
             // Exercise the same delivery method called by the running foreground service.
             com.xauusdpro99.data.news.EconomicNewsEngine production=new com.xauusdpro99.data.news.EconomicNewsEngine();
-            String unique="CI fixture "+now;
-            assertTrue(production.updateJson(payload.replace("CPI instrumentation fixture",unique),com.xauusdpro99.data.news.EconomicCalendarClient.PRIMARY,now));
+            String unique="CPI CI fixture "+now;
+            assertTrue("Production fixture must retain a supported economic event name",production.updateJson(payload.replace("CPI instrumentation fixture",unique),com.xauusdpro99.data.news.EconomicCalendarClient.PRIMARY,now));
             android.content.SharedPreferences prefs=c.getSharedPreferences("notification_settings",Context.MODE_PRIVATE);
             java.util.Map<String,?> saved=prefs.getAll();
             try{
