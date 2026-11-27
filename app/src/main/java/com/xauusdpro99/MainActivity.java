@@ -193,11 +193,18 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         refresh.setOnClickListener(v->{if(engine!=null)engine.refresh();else Toast.makeText(this,"Tick dipantau Foreground Service",Toast.LENGTH_SHORT).show();});
         Button refreshCandles=new Button(this);refreshCandles.setText("REFRESH OHLC");refreshCandles.setTextSize(11);styleCompactButton(refreshCandles);
         refreshCandles.setOnClickListener(v->{if(candleEngine!=null)candleEngine.refreshAll();else Toast.makeText(this,"Candle dipantau Foreground Service",Toast.LENGTH_SHORT).show();});
-        actions.addView(refresh,new LinearLayout.LayoutParams(0,dp(40),1));actions.addView(refreshCandles,new LinearLayout.LayoutParams(0,dp(40),1));livePage.addView(actions);
+        actions.addView(refresh,new LinearLayout.LayoutParams(0,dp(40),1));actions.addView(refreshCandles,new LinearLayout.LayoutParams(0,dp(40),1));if(!landscape)livePage.addView(actions);
         LinearLayout tfRow=new LinearLayout(this);tfRow.setOrientation(LinearLayout.HORIZONTAL);
         android.widget.HorizontalScrollView tfScroll=new android.widget.HorizontalScrollView(this);tfScroll.setHorizontalScrollBarEnabled(false);
         for(CandleTimeframe tf:CandleTimeframe.values()){final CandleTimeframe choice=tf;Button t=new Button(this);t.setText(tf.name());t.setTextSize(10);styleCompactButton(t);t.setMinWidth(0);t.setPadding(dp(6),0,dp(6),0);t.setOnClickListener(v->{selectedTimeframe=choice;updateChartFromSnapshots();});tfRow.addView(t,new LinearLayout.LayoutParams(-2,dp(40)));}
-        tfScroll.addView(tfRow);livePage.addView(tfScroll,matchWrap());
+        tfScroll.addView(tfRow);
+        if(landscape){
+            LinearLayout chartControls=new LinearLayout(this);
+            chartControls.setOrientation(LinearLayout.HORIZONTAL);
+            chartControls.addView(actions,new LinearLayout.LayoutParams(dp(180),dp(40)));
+            chartControls.addView(tfScroll,new LinearLayout.LayoutParams(0,dp(40),1));
+            livePage.addView(chartControls,matchWrap());
+        }else livePage.addView(tfScroll,matchWrap());
         chartView=new LiveCandleChartView(this);chartView.setContentDescription("LIVE_CANDLE_CHART");livePage.addView(chartView,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout overlays=new LinearLayout(this);overlays.setOrientation(LinearLayout.HORIZONTAL);
         Button ema=new Button(this);ema.setText("EMA: OFF");ema.setTextSize(10);styleCompactButton(ema);ema.setOnClickListener(v->{String[] opts={"OFF","10","20","50","100","200"};int idx=0;for(int i=0;i<opts.length;i++)if(opts[i].equals(selectedEma))idx=i;selectedEma=opts[(idx+1)%opts.length];chartView.setEma(selectedEma);ema.setText("EMA: "+selectedEma);});

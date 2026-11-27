@@ -57,3 +57,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 - Tested commit dabf717329221e0e238e45168ff1c2b5f1c2e4c1; job 140451023761 completed successfully. Unit/build and four instrumentation invocations passed; twelve screenshots captured; background monitoring and notification assertions passed. Fresh news TTS accepted; audible output not asserted.
 - Artifact 15190521217, SHA-256 0561a7a553fbe6036dbeb9e7ba6c19452383c686eca80f563f23dd19e1e1c0d7. Previous visual review found six pages in each orientation, chart labels outside candles, but short landscape plot and repeated zone labels. UI #91 orientation failure did not recur.
 - Follow-up adds actual zone bounds to full chart level labels. Pending CI, landscape layout improvement and dedicated gesture tests. Gate 2 remains open. No trading logic changes.
+
+## Gate 2 — landscape viewport follow-up
+- Run 45985394260, job 140459583254, tested 20968144e1ae6940d6f498240c75d7363647d97f successfully: unit/build, four instrumentation invocations, twelve screenshots, monitoring and notification assertions. Fresh TTS accepted; audible output not asserted. Artifact 15190484344; latest visual inspection pending.
+- Combine refresh controls and horizontally scrollable timeframe selector into one 40dp row in landscape, preserving every button and handler. Portrait unchanged. Expected gain 40dp of chart height; actual viewport and button accessibility pending CI and screenshots. Gate 2 remains open.
