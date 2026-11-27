@@ -48,3 +48,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## 2026-11-27 13:37 WIB — Google APIs emulator orientation regression
 - HEAD 3a969775654157b465d964bc1ea67865b5e35d94: Build #160 (45944990332) passed; UI #91 (45944990276), job 140327523195, failed Stage 1 with Incorrect screenshot orientation: landscape_live_chart.png. Unit/build step and diagnostic upload passed. Google TTS service/package detected; fresh speech and audible output not verified because Stage 3 was not reached.
 - Gates 2/3/8/9/10/11/12 remain open. Test-only correction waits for two consecutive matching display and actual screenshot dimensions after rotation, before navigation and in the in-session rotation test. Existing screenshot assertions retained. Root cause hypothesis is asynchronous rotation; pending CI validation. No production logic changed, no rerun requested.
+
+## Gate 2 — chart presentation follow-up
+- Source review at f2172b3793d9e2ce2c31f63938aaed8c06bfbbfd: separate level label area, UTC candle timestamps, pinch zoom and 300-bar default present. Follow-up prevents a completed pinch or drag from opening the level dialog and indicates omitted inline labels. Full level text remains in the dialog. No trading engine changes.
+- Latest CI status unavailable via connector; no gate pass claimed. Pending gesture tests, both orientations and screenshot review. No rerun requested.

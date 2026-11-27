@@ -31,6 +31,7 @@ public final class LiveCandleChartView extends View {
     private double support=Double.NaN,resistance=Double.NaN;
     private String timeframe="M1",ema="OFF";
     private float lastX,downX,downY;
+    private boolean gestureMoved;
     private int panBars=0, visibleBars=300;
     private float dragRemainder;
     private final ScaleGestureDetector zoom;
@@ -66,7 +67,7 @@ public final class LiveCandleChartView extends View {
         float step=plotW/Math.max(1,(end-start));float body=Math.max(0.5f,Math.min(8f,step*.62f));
         for(int i=start;i<end;i++){Candle b=candles.get(i);float x=left+(i-start+.5f)*step;float yh=map(b.high,min,max,top,bottom),yl=map(b.low,min,max,top,bottom),yo=map(b.open,min,max,top,bottom),yc=map(b.close,min,max,top,bottom);int color=b.close>=b.open?up:down;p.setColor(color);p.setStrokeWidth(1.2f);c.drawLine(x,yh,x,yl,p);p.setStyle(Paint.Style.FILL);c.drawRect(x-body/2,Math.min(yo,yc),x+body/2,Math.max(Math.max(yo,yc),Math.min(yo,yc)+1),p);}
         c.save();c.clipRect(left,top,right,bottom);drawEma(c,start,end,left,step,min,max,top,bottom);c.restore();
-        p.setColor(0xFF9AA9BC);p.setTextSize(dp(9));SimpleDateFormat fmt=new SimpleDateFormat("MM-dd HH:mm",Locale.US);fmt.setTimeZone(TimeZone.getTimeZone("UTC"));float lastRight=-1;for(int j=0;j<3;j++){int i=start+(end-start-1)*j/2;String t=fmt.format(new Date(candles.get(i).openTimeMs));float x=Math.max(left,Math.min(right-p.measureText(t),left+(i-start+.5f)*step-p.measureText(t)/2));if(x>lastRight+dp(3)){c.drawText(t,x,bottom+dp(12),p);lastRight=x+p.measureText(t);}}c.drawText("UTC | "+(end-start)+"/"+candles.size()+" bars",left,bottom+dp(23),p);if(!fullLabels.isEmpty()){p.setColor(0xFFB9C7D8);c.drawText("LEVELS ("+fullLabels.size()+")",right+dp(3),bottom+dp(15),p);setContentDescription("LIVE_CANDLE_CHART");}
+        p.setColor(0xFF9AA9BC);p.setTextSize(dp(9));SimpleDateFormat fmt=new SimpleDateFormat("MM-dd HH:mm",Locale.US);fmt.setTimeZone(TimeZone.getTimeZone("UTC"));float lastRight=-1;for(int j=0;j<3;j++){int i=start+(end-start-1)*j/2;String t=fmt.format(new Date(candles.get(i).openTimeMs));float x=Math.max(left,Math.min(right-p.measureText(t),left+(i-start+.5f)*step-p.measureText(t)/2));if(x>lastRight+dp(3)){c.drawText(t,x,bottom+dp(12),p);lastRight=x+p.measureText(t);}}c.drawText("UTC | "+(end-start)+"/"+candles.size()+" bars",left,bottom+dp(23),p);if(!fullLabels.isEmpty()){p.setColor(0xFFB9C7D8);c.drawText("LEVELS ("+fullLabels.size()+")"+(omittedLabels>0?" +":""),right+dp(3),bottom+dp(15),p);setContentDescription("LIVE_CANDLE_CHART");}
     }
     private void drawEma(Canvas c,int start,int end,float left,float step,double min,double max,float top,float bottom){
         int period;try{period=Integer.parseInt(ema);}catch(Exception ex){return;}if(period<2)return;
@@ -84,10 +85,11 @@ public final class LiveCandleChartView extends View {
     @Override public boolean onTouchEvent(MotionEvent e){
         zoom.onTouchEvent(e);
         int action=e.getActionMasked();
-        if(action==MotionEvent.ACTION_DOWN){lastX=e.getX();downX=lastX;downY=e.getY();dragRemainder=0;return true;}
+        if(action==MotionEvent.ACTION_DOWN){lastX=e.getX();downX=lastX;downY=e.getY();gestureMoved=false;dragRemainder=0;return true;}
+        if(action==MotionEvent.ACTION_POINTER_DOWN){gestureMoved=true;return true;}
         if(action==MotionEvent.ACTION_POINTER_UP){lastX=e.getX(e.getActionIndex()==0?1:0);dragRemainder=0;return true;}
-        if(action==MotionEvent.ACTION_MOVE){float dx=e.getX()-lastX;lastX=e.getX();if(!zoom.isInProgress()&&e.getPointerCount()==1&&!candles.isEmpty()){dragRemainder+=dx/Math.max(1,(getWidth()-Math.min(dp(156),getWidth()*.40f)-dp(6))/Math.min(visibleBars,candles.size()));int shift=(int)dragRemainder;dragRemainder-=shift;panBars=Math.max(0,Math.min(candles.size()-1,panBars+shift));invalidate();}return true;}
-        if(action==MotionEvent.ACTION_UP&&Math.abs(e.getX()-downX)<dp(8)&&Math.abs(e.getY()-downY)<dp(8)&&downX>getWidth()-Math.min(dp(156),getWidth()*.40f)&&!fullLabels.isEmpty()){performClick();new android.app.AlertDialog.Builder(getContext()).setTitle("Chart levels").setMessage(android.text.TextUtils.join("\n",fullLabels)).setPositiveButton("OK",null).show();}
+        if(action==MotionEvent.ACTION_MOVE){if(Math.abs(e.getX()-downX)>=dp(8)||Math.abs(e.getY()-downY)>=dp(8))gestureMoved=true;float dx=e.getX()-lastX;lastX=e.getX();if(!zoom.isInProgress()&&e.getPointerCount()==1&&!candles.isEmpty()){dragRemainder+=dx/Math.max(1,(getWidth()-Math.min(dp(156),getWidth()*.40f)-dp(6))/Math.min(visibleBars,candles.size()));int shift=(int)dragRemainder;dragRemainder-=shift;panBars=Math.max(0,Math.min(candles.size()-1,panBars+shift));invalidate();}return true;}
+        if(action==MotionEvent.ACTION_UP&&!gestureMoved&&Math.abs(e.getX()-downX)<dp(8)&&Math.abs(e.getY()-downY)<dp(8)&&downX>getWidth()-Math.min(dp(156),getWidth()*.40f)&&!fullLabels.isEmpty()){performClick();new android.app.AlertDialog.Builder(getContext()).setTitle("Chart levels").setMessage(android.text.TextUtils.join("\n",fullLabels)).setPositiveButton("OK",null).show();}
         return true;
     }
     @Override public boolean performClick(){super.performClick();return true;}
