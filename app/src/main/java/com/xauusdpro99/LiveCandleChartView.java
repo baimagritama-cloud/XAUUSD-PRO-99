@@ -61,7 +61,7 @@ public final class LiveCandleChartView extends View {
         if(Double.isFinite(support))min=Math.min(min,support);if(Double.isFinite(resistance))max=Math.max(max,resistance);
         double pad=Math.max((max-min)*.08,.01);min-=pad;max+=pad;final double range=max-min;
         for(int i=0;i<5;i++){double v=max-range*i/4d;float y=map(v,min,max,top,bottom);p.setColor(0xFF9AA9BC);p.setTextSize(dp(10));c.drawText(String.format(Locale.US,"%.2f",v),right+dp(3),y+dp(3),p);}
-        for(Zone z:zones){float y1=map(z.upper,min,max,top,bottom),y2=map(z.lower,min,max,top,bottom);p.setColor(z.demand?0x3320A8FF:0x33FF5268);c.drawRect(left,Math.min(y1,y2),right,Math.max(y1,y2),p);p.setColor(z.demand?0xFF55B8FF:0xFFFF7888);label(c,z.label,right+dp(52),Math.min(y1,y2)+dp(10),top,bottom);}
+        for(Zone z:zones){float y1=map(z.upper,min,max,top,bottom),y2=map(z.lower,min,max,top,bottom);p.setColor(z.demand?0x3320A8FF:0x33FF5268);c.drawRect(left,Math.min(y1,y2),right,Math.max(y1,y2),p);p.setColor(z.demand?0xFF55B8FF:0xFFFF7888);label(c,String.format(Locale.US,"%s %.2f–%.2f",z.label==null?(z.demand?"DEMAND":"SUPPLY"):z.label,z.lower,z.upper),right+dp(52),Math.min(y1,y2)+dp(10),top,bottom);}
         if(Double.isFinite(resistance))level(c,left,right,map(resistance,min,max,top,bottom),0xFFFF6677,"R "+String.format(Locale.US,"%.2f",resistance),top,bottom);
         if(Double.isFinite(support))level(c,left,right,map(support,min,max,top,bottom),0xFF55B8FF,"S "+String.format(Locale.US,"%.2f",support),top,bottom);
         float step=plotW/Math.max(1,(end-start));float body=Math.max(0.5f,Math.min(8f,step*.62f));

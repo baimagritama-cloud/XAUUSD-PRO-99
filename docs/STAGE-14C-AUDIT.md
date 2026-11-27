@@ -52,3 +52,8 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## Gate 2 — chart presentation follow-up
 - Source review at f2172b3793d9e2ce2c31f63938aaed8c06bfbbfd: separate level label area, UTC candle timestamps, pinch zoom and 300-bar default present. Follow-up prevents a completed pinch or drag from opening the level dialog and indicates omitted inline labels. Full level text remains in the dialog. No trading engine changes.
 - Latest CI status unavailable via connector; no gate pass claimed. Pending gesture tests, both orientations and screenshot review. No rerun requested.
+
+## Gate 2 — verified UI run 45982891680
+- Tested commit dabf717329221e0e238e45168ff1c2b5f1c2e4c1; job 140451023761 completed successfully. Unit/build and four instrumentation invocations passed; twelve screenshots captured; background monitoring and notification assertions passed. Fresh news TTS accepted; audible output not asserted.
+- Artifact 15190521217, SHA-256 0561a7a553fbe6036dbeb9e7ba6c19452383c686eca80f563f23dd19e1e1c0d7. Previous visual review found six pages in each orientation, chart labels outside candles, but short landscape plot and repeated zone labels. UI #91 orientation failure did not recur.
+- Follow-up adds actual zone bounds to full chart level labels. Pending CI, landscape layout improvement and dedicated gesture tests. Gate 2 remains open. No trading logic changes.
