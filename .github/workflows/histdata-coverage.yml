@@ -1,0 +1,21 @@
+name: HistData seven year coverage audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/histdata-coverage.yml'
+      - 'scripts/histdata-coverage.py'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/histdata-coverage.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: histdata-coverage
+          path: audit-alternatives/
