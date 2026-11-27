@@ -81,7 +81,7 @@ def audit():
     # Provider reports describe tick gaps, not verified exchange closures.
     from collections import Counter
     import bisect
-    intervals=[]; classes=Counter(); malformed=0; duration_mismatch=0
+    intervals=[]; classes=Counter(); malformed=0; duration_mismatch=0; duration_offsets=Counter(); unexplained_duration=0
     for path in sorted(out.glob('provider-metadata-*.txt')):
         for line in path.read_text(errors='replace').splitlines():
             if not line.strip().startswith('Gap of'):continue
@@ -92,7 +92,10 @@ def audit():
                 if b<=a:raise ValueError()
             except ValueError:malformed+=1;continue
             duration=(b-a).total_seconds()
-            if abs(duration-seconds)>1:duration_mismatch+=1
+            offset=int(duration-seconds)
+            duration_offsets[offset]+=1
+            if abs(offset)>1:duration_mismatch+=1
+            if offset not in (0,1,6,7):unexplained_duration+=1
             kind='UNCLASSIFIED'
             if a.weekday()==4 and b.weekday()==6 and duration>=86400:kind='POSSIBLE_WEEKEND'
             elif a.date()==b.date() and a.hour in (15,16,17) and 3300<=duration<=3900:kind='POSSIBLE_DAILY_PAUSE'
@@ -108,11 +111,17 @@ def audit():
         if b-a<=60:continue
         i=bisect.bisect_left(starts,b)-1
         gaps['observed']+=1
+        left=datetime.datetime.fromtimestamp(a,tz); right=datetime.datetime.fromtimestamp(b,tz)
+        if left.weekday()==4 and right.weekday()==6 and 36*3600<=b-a<=60*3600:
+            gaps['possible_weekend_from_ohlc']+=1
+        elif left.weekday()==4 and right.weekday()==0 and 36*3600<=b-a<=84*3600:
+            gaps['possible_weekend_from_ohlc']+=1
+        else:gaps['other_observed_gap']+=1
         if i>=0 and prefix[i]>a:gaps['overlaps_provider_report']+=1
         else:gaps['no_report_overlap']+=1
-    report['histdata']['gap_classification']={'classes':dict(classes),'malformed':malformed,'duration_mismatch':duration_mismatch,'ohlc_gaps':dict(gaps),'calendar_verified':False,'note':'Overlap is diagnostic only; no inferred closure is certified.'}
+    report['histdata']['gap_classification']={'classes':dict(classes),'malformed':malformed,'duration_mismatch':duration_mismatch,'duration_offsets_seconds':dict(duration_offsets),'outside_observed_offset_pattern':unexplained_duration,'ohlc_gaps':dict(gaps),'calendar_verified':False,'note':'Overlap is diagnostic only; no inferred closure is certified.'}
     print(json.dumps(report['histdata']['gap_classification']),flush=True)
-    if not intervals or malformed:raise ValueError('Missing or malformed provider gap metadata')
+    if not intervals or malformed or unexplained_duration:raise ValueError('Missing or malformed provider gap metadata')
     # UTC bucket convention matches CandleTimeframe; observed gaps are not assumed holidays.
     from collections import Counter
     days={}; weeks={}
