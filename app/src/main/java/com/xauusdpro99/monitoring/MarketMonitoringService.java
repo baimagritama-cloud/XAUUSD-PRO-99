@@ -272,14 +272,14 @@ public final class MarketMonitoringService extends Service
             SharedPreferences np=getSharedPreferences("notification_settings",MODE_PRIVATE);
             Set<String> types=np.getStringSet("alert_types",null);
             if(types!=null&&!types.contains("NEWS_ALERT"))continue;
-            String title="XAUUSD — ECONOMIC NEWS — "+a.title();
+            String title="XAUUSD — ECONOMIC NEWS — "+a.title()+" — "+a.event.name+" — "+java.time.Instant.ofEpochMilli(a.event.releaseAtMs);
             String msg=a.event.name+" | "+a.event.country+" | "+a.event.impact+" | "+a.event.status
                 +" | Previous="+(a.event.previous==null?"DATA UNAVAILABLE":a.event.previous)
                 +" | Forecast="+(a.event.forecast==null?"DATA UNAVAILABLE":a.event.forecast)
                 +" | Actual="+(a.event.actual==null?"DATA UNAVAILABLE":a.event.actual);
             long now=System.currentTimeMillis();
             int cooldown=Math.max(0,Math.min(1440,np.getInt("cooldown_minutes",5)));
-            long id=notifications.recordAlert(title,msg,now,now,cooldown*60000L);
+            long id=notifications.recordAlert(title,msg,a.event.releaseAtMs,now,cooldown*60000L);
             if(id>0&&np.getBoolean("notifications_enabled",true))notifications.show(this,id,title,msg);
             boolean quiet=np.getBoolean("quiet_enabled",false)&&NotificationPolicy.isQuietHours(
                 NotificationPolicy.currentMinuteOfDay(),np.getInt("quiet_start",1320),np.getInt("quiet_end",420));
