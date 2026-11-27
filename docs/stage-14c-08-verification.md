@@ -15,3 +15,9 @@ Commit 1f9ac73a7d906d739c24be0e46dc109f157d2677:
 - Confirm actual delivery with live release and foreground/background transition; do not fabricate values or claim audio success from a unit test.
 
 No final APK, no Stage 15, and no item 9 until required gates are verified. Existing trading engines and SignalR retained.
+
+## Verified 2026-11-27 WIB
+- Probe #3 run 45887882969, artifact 15149713847: downloaded XML inspected; tests=1, skipped=0, failures=0, errors=0. livePrimaryAndRealFallback output: LIVE PRIMARY events=12; LIVE FALLBACK events=12. Both endpoints HTTP 200. Controlled primary outage, real fallback HTTP fetch.
+- Probe #2 run 45887861415 failed during Gradle classpath dependency resolution (kotlin-stdlib-jdk8:1.9.20), before calendar test execution. Subsequent probe passed.
+- HEAD ed93b77907eb516830d8c0d11764d0d2b49e068e: build 45901327491 and emulator 45901327480 passed, unit test task successful, 12 screenshots and background monitoring assertions confirmed in logs.
+- Remaining: device-level calendar notification delivery and audible bell/TTS evidence. Gate 8 remains OPEN. No claim of physical audio verification.
