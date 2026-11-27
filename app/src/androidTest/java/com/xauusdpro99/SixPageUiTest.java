@@ -289,6 +289,37 @@ public final class SixPageUiTest {
             assertTrue("Different event suppressed by cooldown",center.recordAlert(nfp,"TEST ONLY",releaseTime,now,300000L)>0);
             assertTrue("Same event repeated",center.recordAlert(cpi,"TEST ONLY",releaseTime,now+1000L,300000L)<0);
             assertTrue("Next milestone suppressed",center.recordAlert(cpi+" — 45 minutes","TEST ONLY",releaseTime,now+4500000L,300000L)>0);
+            // Exercise the same delivery method called by the running foreground service.
+            com.xauusdpro99.data.news.EconomicNewsEngine production=new com.xauusdpro99.data.news.EconomicNewsEngine();
+            String unique="CI fixture "+now;
+            assertTrue(production.updateJson(payload.replace("CPI instrumentation fixture",unique),com.xauusdpro99.data.news.EconomicCalendarClient.PRIMARY,now));
+            android.content.SharedPreferences prefs=c.getSharedPreferences("notification_settings",Context.MODE_PRIVATE);
+            java.util.Map<String,?> saved=prefs.getAll();
+            try{
+                prefs.edit().remove("alert_types").putBoolean("notifications_enabled",true).putBoolean("voice_enabled",false).commit();
+                MarketMonitoringService.deliverCalendarAlerts(c,production,center,null,now);
+                int matches=0;
+                for(com.xauusdpro99.notification.NotificationCenter.Item item:center.recent(200)){
+                    if(item.title.contains(unique)){matches++;nm.cancel((int)(item.id&0x7fffffff));}
+                }
+                org.junit.Assert.assertEquals("Production delivery history",1,matches);
+                MarketMonitoringService.deliverCalendarAlerts(c,production,center,null,now);
+                int repeated=0;
+                for(com.xauusdpro99.notification.NotificationCenter.Item item:center.recent(200))if(item.title.contains(unique))repeated++;
+                org.junit.Assert.assertEquals(1,repeated);
+            }finally{
+                android.content.SharedPreferences.Editor edit=prefs.edit().clear();
+                for(java.util.Map.Entry<String,?> entry:saved.entrySet()){
+                    Object v=entry.getValue();String k=entry.getKey();
+                    if(v instanceof Boolean)edit.putBoolean(k,(Boolean)v);
+                    else if(v instanceof Integer)edit.putInt(k,(Integer)v);
+                    else if(v instanceof Long)edit.putLong(k,(Long)v);
+                    else if(v instanceof Float)edit.putFloat(k,(Float)v);
+                    else if(v instanceof String)edit.putString(k,(String)v);
+                    else if(v instanceof java.util.Set)edit.putStringSet(k,(java.util.Set<String>)v);
+                }
+                edit.commit();
+            }
             java.util.concurrent.atomic.AtomicReference<com.xauusdpro99.voice.VoiceEngine> voice=new java.util.concurrent.atomic.AtomicReference<>();
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->voice.set(new com.xauusdpro99.voice.VoiceEngine(c,status->android.util.Log.i("NewsVoiceTest",status))));
             try{
