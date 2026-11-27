@@ -267,9 +267,13 @@ public final class MarketMonitoringService extends Service
     }
     private synchronized void dispatchCalendarAlerts(long nowMs){
         if(stopping||!networkAvailable)return;
+        deliverCalendarAlerts(this,news,notifications,voice,nowMs);
+    }
+    /** Shared production delivery path, also exercised by Android instrumentation. */
+    public static void deliverCalendarAlerts(Context context,EconomicNewsEngine news,NotificationCenter notifications,VoiceEngine voice,long nowMs){
         news.markStale(nowMs);
         for(EconomicNewsEngine.Alert a:news.evaluateAlerts(nowMs)){
-            SharedPreferences np=getSharedPreferences("notification_settings",MODE_PRIVATE);
+            SharedPreferences np=context.getSharedPreferences("notification_settings",Context.MODE_PRIVATE);
             Set<String> types=np.getStringSet("alert_types",null);
             if(types!=null&&!types.contains("NEWS_ALERT"))continue;
             String title="XAUUSD — ECONOMIC NEWS — "+a.title()+" — "+a.event.name+" — "+java.time.Instant.ofEpochMilli(a.event.releaseAtMs);
@@ -280,7 +284,7 @@ public final class MarketMonitoringService extends Service
             long now=System.currentTimeMillis();
             int cooldown=Math.max(0,Math.min(1440,np.getInt("cooldown_minutes",5)));
             long id=notifications.recordAlert(title,msg,a.event.releaseAtMs,now,cooldown*60000L);
-            if(id>0&&np.getBoolean("notifications_enabled",true))notifications.show(this,id,title,msg);
+            if(id>0&&np.getBoolean("notifications_enabled",true))notifications.show(context,id,title,msg);
             boolean quiet=np.getBoolean("quiet_enabled",false)&&NotificationPolicy.isQuietHours(
                 NotificationPolicy.currentMinuteOfDay(),np.getInt("quiet_start",1320),np.getInt("quiet_end",420));
             if(id>0&&np.getBoolean("voice_enabled",true)&&!quiet&&voice!=null)
