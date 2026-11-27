@@ -217,4 +217,11 @@ fi
 adb logcat -b all -d -v threadtime > artifacts/diagnostics/stage2-logcat.txt 2>&1
 
 echo "STAGE 2 PASSED: Background Monitoring integration assertions completed."
+wait_for_stable_framework stage3
+ echo "STAGE 3: calendar notification and voice safety instrumentation"
+start_live_evidence_capture stage3
+run_orchestrated stage3 calendarNotificationDeliveryAndVoiceSafety
+stop_live_evidence_capture
+adb logcat -b all -d -v threadtime > artifacts/diagnostics/stage3-logcat.txt 2>&1
+echo "STAGE 3 PASSED: notification posting and stale voice suppression; audible output not asserted."
 echo "ALL STAGES PASSED."
