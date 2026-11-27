@@ -196,6 +196,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         actions.addView(refresh,new LinearLayout.LayoutParams(0,dp(40),1));actions.addView(refreshCandles,new LinearLayout.LayoutParams(0,dp(40),1));if(!landscape)livePage.addView(actions);
         LinearLayout tfRow=new LinearLayout(this);tfRow.setOrientation(LinearLayout.HORIZONTAL);
         android.widget.HorizontalScrollView tfScroll=new android.widget.HorizontalScrollView(this);tfScroll.setHorizontalScrollBarEnabled(false);
+        tfScroll.setContentDescription("CHART_TIMEFRAME_NAVIGATION");
         for(CandleTimeframe tf:CandleTimeframe.values()){final CandleTimeframe choice=tf;Button t=new Button(this);t.setText(tf.name());t.setTextSize(10);styleCompactButton(t);t.setMinWidth(0);t.setPadding(dp(6),0,dp(6),0);t.setOnClickListener(v->{selectedTimeframe=choice;updateChartFromSnapshots();});tfRow.addView(t,new LinearLayout.LayoutParams(-2,dp(40)));}
         tfScroll.addView(tfRow);
         if(landscape){

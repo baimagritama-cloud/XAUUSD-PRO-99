@@ -169,7 +169,8 @@ public final class SixPageUiTest {
     private static void exerciseChartControls(UiDevice device) {
         click(device, "REFRESH");
         click(device, "REFRESH OHLC");
-        click(device, "M1");
+        exerciseTimeframes(device);
+        clickTimeframe(device, "M1");
         click(device, "EMA: OFF");
         click(device, "INDICATOR: RSI14");
         assertTrue("Indicator selection did not change", device.wait(Until.hasObject(By.text("INDICATOR: MOM14")), 10000L));
@@ -181,6 +182,32 @@ public final class SixPageUiTest {
         click(device, "TUTUP");
         assertTrue("Chart controls unavailable after closing details", device.wait(Until.hasObject(By.text("DETAIL OHLC")), 10000L));
         device.waitForIdle();
+    }
+
+    private static void exerciseTimeframes(UiDevice device) {
+        for (com.xauusdpro99.data.candle.CandleTimeframe tf : com.xauusdpro99.data.candle.CandleTimeframe.values()) {
+            clickTimeframe(device, tf.name());
+            assertTrue("Chart missing after selecting "+tf.name(),
+                device.wait(Until.hasObject(By.desc("LIVE_CANDLE_CHART")),10000L));
+            android.util.Log.i("ChartUiTest","Timeframe button exercised: "+tf.name());
+        }
+    }
+
+    private static void clickTimeframe(UiDevice device,String name) {
+        for(int attempt=0;attempt<20;attempt++){
+            UiObject2 strip=device.wait(Until.findObject(By.desc("CHART_TIMEFRAME_NAVIGATION")),5000L);
+            assertTrue("Timeframe navigation missing",strip!=null);
+            UiObject2 button=strip.findObject(By.text(name));
+            if(button!=null && button.getVisibleBounds().width()>0){
+                button.click();device.waitForIdle();return;
+            }
+            android.graphics.Rect b=strip.getVisibleBounds();
+            int left=b.left+b.width()/8,right=b.right-b.width()/8;
+            if(attempt<10)device.swipe(right,b.centerY(),left,b.centerY(),20);
+            else device.swipe(left,b.centerY(),right,b.centerY(),20);
+            device.waitForIdle();
+        }
+        throw new AssertionError("Timeframe button not reachable: "+name);
     }
 
     private static void captureAllPages(UiDevice device, File output, String orientation) throws Exception {
