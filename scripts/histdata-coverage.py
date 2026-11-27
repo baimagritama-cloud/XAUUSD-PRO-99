@@ -172,6 +172,25 @@ def audit():
         blocked=sum(x['status']=='QUARANTINED' for x in records)
         quarantine[name]={'observed_closed':len(records),'quarantined':blocked,'pending_calendar':len(records)-blocked,'verified':0,'affected_without_observed_candle':sum(k not in closed for k in reasons)}
         (out/(name+'-quarantine.json')).write_text(json.dumps(records,indent=2))
+    # Strict UTC continuity diagnostic. No calendar exemptions are assumed.
+    continuity={}
+    for name,step in [('D1',86400),('W1',604800)]:
+        records=json.loads((out/(name+'-quarantine.json')).read_text())
+        records.sort(key=lambda x:x['start_utc'])
+        longest=0; run=0; previous=None; breaks=[]; latest=0
+        for rec in records:
+            k=rec['start_utc']
+            clean=rec['status']=='PENDING_CALENDAR_VERIFICATION'
+            adjacent=previous is not None and k-previous==step
+            if previous is not None and not adjacent:
+                breaks.append({'previous_utc':previous,'next_utc':k,'missing_buckets':(k-previous)//step-1})
+            run=(run+1 if adjacent else 1) if clean else 0
+            longest=max(longest,run);previous=k
+        latest=run
+        continuity[name]={'observed_sessions':len(records),'longest_adjacent_candidate_run':longest,'latest_adjacent_candidate_run':latest,'missing_bucket_intervals':len(breaks),'latest_300_adjacent_candidate_pass':latest>=300,'calendar_verified':False,'verified_count':0,'note':'Strict UTC adjacency only; weekends and holidays not exempted. Latest refers to archive end, not live market.'}
+        (out/(name+'-continuity-breaks.json')).write_text(json.dumps(breaks,indent=2))
+    report['histdata']['continuity_audit']=continuity
+    print(json.dumps({'continuity_audit':continuity}),flush=True)
     report['histdata']['session_quarantine']=quarantine
     report['histdata']['candidate_coverage_gate']={name:{'target':300,'pending_candidates':q['pending_calendar'],'shortfall':max(0,300-q['pending_calendar']),'candidate_count_pass':q['pending_calendar']>=300,'verified_count_pass':False} for name,q in quarantine.items()}
     print(json.dumps(report['histdata']['candidate_coverage_gate']),flush=True)
