@@ -1,10 +1,16 @@
-import urllib.request, urllib.parse, datetime, json, pathlib, re, zipfile, io, hashlib, csv, math
+import http.cookiejar, urllib.request, urllib.parse, datetime, json, pathlib, re, zipfile, io, hashlib, csv, math
 from html.parser import HTMLParser
 out=pathlib.Path('audit-alternatives'); out.mkdir(exist_ok=True)
 report={}
-def get(url, data=None):
-    req=urllib.request.Request(url,data=data,headers={'User-Agent':'XAUUSD-PRO-99 historical research audit/1.0'})
-    with urllib.request.urlopen(req,timeout=40) as r:
+session=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+def get(url, data=None, referer=None):
+    headers={'User-Agent':'XAUUSD-PRO-99 historical research audit/1.0','Accept':'*/*'}
+    if referer:
+        headers.update({'Referer':referer,'Origin':'https://www.histdata.com','Content-Type':'application/x-www-form-urlencoded'})
+    req=urllib.request.Request(url,data=data,headers=headers)
+    with session.open(req,timeout=40) as r:
+        if data is not None:
+            report['histdata']['download_response']={'http':r.status,'url_path':urllib.parse.urlparse(r.geturl()).path,'content_type':r.headers.get('Content-Type'),'content_length':r.headers.get('Content-Length'),'attachment':bool(r.headers.get('Content-Disposition'))}
         b=r.read(40*1024*1024+1)
         if len(b)>40*1024*1024: raise ValueError('response too large')
         return r.geturl(),r.status,b
@@ -24,9 +30,14 @@ def audit_hist():
     for f in p.forms:
         target=urllib.parse.urljoin(final,f['action'])
         if f['method']!='post' or urllib.parse.urlparse(target).hostname not in ('www.histdata.com','histdata.com') or urllib.parse.urlparse(target).path!='/get.php': continue
-        if not f['fields']: continue
-        final,status,b=get(target,urllib.parse.urlencode(f['fields']).encode())
-        if not zipfile.is_zipfile(io.BytesIO(b)): raise ValueError('Download is not ZIP')
+        if not {'tk','date','datemonth','platform','timeframe','fxpair'}.issubset(f['fields']): continue
+        if not f['fields']['tk'] or f['fields']['fxpair'].upper()!='XAUUSD' or f['fields']['timeframe'].upper()!='M1': continue
+        report['histdata']['form_fields']=sorted(f['fields'])
+        report['histdata']['period']={k:f['fields'][k] for k in ('date','datemonth','platform','timeframe','fxpair')}
+        final,status,b=get(target,urllib.parse.urlencode(f['fields']).encode(),referer=final)
+        if not zipfile.is_zipfile(io.BytesIO(b)):
+            report['histdata']['download_response'].update(bytes=len(b),sha256=hashlib.sha256(b).hexdigest(),html_like=b.lstrip().startswith(b'<'),zip_magic=b.startswith(b'PK'))
+            raise ValueError('Download is not ZIP; see response metadata; no access-control bypass attempted')
         rows={}; invalid=0; duplicates=0
         with zipfile.ZipFile(io.BytesIO(b)) as z:
             for n in z.namelist():
