@@ -146,8 +146,9 @@ grep -F 'com.xauusdpro99.test/androidx.test.runner.AndroidJUnitRunner' artifacts
 
 run_orchestrated() {
   local stage="$1" method="$2" result=0
+  local test_class="${3:-com.xauusdpro99.SixPageUiTest}"
   local output="artifacts/diagnostics/${stage}-instrumentation.txt"
-  timeout 600 adb shell 'CLASSPATH=$(pm path androidx.test.services | cut -d: -f2) app_process / androidx.test.services.shellexecutor.ShellMain am instrument -w -r -e class com.xauusdpro99.SixPageUiTest#'"$method"' -e targetInstrumentation com.xauusdpro99.test/androidx.test.runner.AndroidJUnitRunner androidx.test.orchestrator/androidx.test.orchestrator.AndroidTestOrchestrator' > "$output" 2>&1 || result=$?
+  timeout 600 adb shell 'CLASSPATH=$(pm path androidx.test.services | cut -d: -f2) app_process / androidx.test.services.shellexecutor.ShellMain am instrument -w -r -e class '"$test_class#$method"' -e targetInstrumentation com.xauusdpro99.test/androidx.test.runner.AndroidJUnitRunner androidx.test.orchestrator/androidx.test.orchestrator.AndroidTestOrchestrator' > "$output" 2>&1 || result=$?
   cat "$output"
   [[ "$result" -eq 0 ]] || return "$result"
   if grep -Eq 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|shortMsg=|INSTRUMENTATION_STATUS_CODE: -[12]' "$output"; then
@@ -244,4 +245,9 @@ stop_live_evidence_capture
 adb logcat -b all -d -v threadtime > artifacts/diagnostics/stage3-logcat.txt 2>&1
 grep -E "NewsVoiceTest|VoiceEngine.*(Bell requested|TTS requested)" artifacts/diagnostics/stage3-logcat.txt | tail -60 || true
  echo "STAGE 3 PASSED: notification assertions; inspect TTS readiness and acceptance above; audible output not asserted."
+wait_for_stable_framework stage4
+start_live_evidence_capture stage4
+run_orchestrated stage4 restoresClosedHistoryWithoutLiveFeed com.xauusdpro99.data.candle.CandleStoreRecoveryTest
+stop_live_evidence_capture
+echo "STAGE 4 PASSED: SQLite reopen and offline freshness assertions."
 echo "ALL STAGES PASSED."

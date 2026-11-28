@@ -13,7 +13,10 @@ import java.util.List;
 public final class CandleStore extends SQLiteOpenHelper {
     private static final String TABLE = "biquote_closed";
     public CandleStore(Context context) {
-        super(context.getApplicationContext(), "biquote_ohlc.db", null, 1);
+        this(context, "biquote_ohlc.db");
+    }
+    CandleStore(Context context, String databaseName) {
+        super(context.getApplicationContext(), databaseName, null, 1);
     }
     @Override public void onCreate(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE "+TABLE+" (tf TEXT NOT NULL, ts INTEGER NOT NULL, o REAL NOT NULL, h REAL NOT NULL, l REAL NOT NULL, c REAL NOT NULL, volume REAL NOT NULL, ticks INTEGER NOT NULL, received INTEGER NOT NULL, PRIMARY KEY(tf,ts))");
@@ -45,7 +48,7 @@ public final class CandleStore extends SQLiteOpenHelper {
         try(Cursor c=getReadableDatabase().query(TABLE,null,"tf=?",new String[]{tf.name()},null,null,"ts DESC",Integer.toString(limit))) {
             while(c.moveToNext()) {
                 Candle bar=new Candle("XAUUSD",tf,c.getLong(c.getColumnIndexOrThrow("ts")),c.getDouble(c.getColumnIndexOrThrow("o")),c.getDouble(c.getColumnIndexOrThrow("h")),c.getDouble(c.getColumnIndexOrThrow("l")),c.getDouble(c.getColumnIndexOrThrow("c")),c.getDouble(c.getColumnIndexOrThrow("volume")),c.getLong(c.getColumnIndexOrThrow("ticks")),false,"BiQuote OHLC SQLite",c.getLong(c.getColumnIndexOrThrow("received")));
-                if(CandleEngine.isValid(bar,now)) result.add(bar);
+                if(CandleEngine.isValid(bar,now) && bar.receivedAtMs >= bar.closeTimeMs() && bar.receivedAtMs <= now) result.add(bar);
             }
         }
         Collections.reverse(result);

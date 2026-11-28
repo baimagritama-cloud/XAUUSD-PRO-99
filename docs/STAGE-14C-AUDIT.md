@@ -106,3 +106,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## SQLite gate 7 — conservative W1 history
 - Gate 6 build 46119659663 and UI 46119659632 succeeded on e31c00af456e539e383d3cc7451de2b289abc96b.
 - Native W1 interval remains undocumented in audited client; no guessed endpoint. Aggregate only closed Monday-Friday UTC D1 groups with no weekend bars, validated source/time/OHLC, deduplication and overflow checks. Reject incomplete/holiday weeks rather than inventing bars. Read up to 10000 stored D1 bars. W1 stays historical STALE pending provider session-calendar verification; 300 weeks and native equivalence not established. CI and targeted tests pending.
+
+## SQLite gate 8 — recovery instrumentation
+- Gate 7 UI 46121312359 succeeded; artifact 15253967399. W1 session verification remains open.
+- Validate persisted reception timestamps on load. Add isolated on-device SQLite reopen test (separate test DB), duplicate/revision checks, invalid/running rejection, 300-bar retention and STALE after restore/network failure. Append stage 4 to existing orchestrated workflow; no previous assertions removed. Pending CI. Actual process death/device reboot and physical network interruption not yet tested; no destructive database recovery introduced.
