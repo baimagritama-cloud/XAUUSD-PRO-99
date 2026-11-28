@@ -64,13 +64,21 @@ public final class MultiTimeframeEngine {
                     listener.onLog(tf + ": gagal mengambil OHLC — " + error.getMessage());
                 }
             }
-            if (m1 != null) {
-                List<Candle> sorted = new ArrayList<>(m1);
-                sorted.sort(Comparator.comparingLong(c -> c.openTimeMs));
-                long now = System.currentTimeMillis();
+            long now = System.currentTimeMillis();
+            List<Candle> history = new ArrayList<>();
+            if (store != null) {
+                try { history.addAll(store.loadNative(CandleTimeframe.M1, 10000, now)); }
+                catch (Exception error) { listener.onLog("M1: SQLite aggregation history failed: " + error.getMessage()); }
+            }
+            history.addAll(engines.get(CandleTimeframe.M1).snapshot(now).closed);
+            if (m1 != null) history.addAll(m1);
+            CandleEngine.Snapshot m1State = engines.get(CandleTimeframe.M1).snapshot(now);
+            if (!history.isEmpty()) {
+                List<Candle> sorted = mergeM1History(history, now);
                 for (CandleTimeframe tf : new CandleTimeframe[]{CandleTimeframe.M2, CandleTimeframe.M3}) {
                     List<Candle> aggregated = aggregateClosedM1(sorted, tf, now);
-                    engines.get(tf).replaceAggregated(aggregated, now, "AGGREGATED dari BiQuote M1 (bukan candle native)");
+                    engines.get(tf).replaceAggregated(aggregated, now, "AGGREGATED dari BiQuote M1 REST/SQLite (bukan candle native)",
+                            m1State.sourceStatus == CandleEngine.SourceStatus.LIVE ? m1State.lastResponseAtMs : 0);
                     listener.onLog(tf + ": hasil agregasi lengkap " + aggregated.size() + " candle.");
                 }
             } else {
@@ -79,6 +87,19 @@ public final class MultiTimeframeEngine {
             }
             listener.onUpdated(snapshotAll(System.currentTimeMillis()));
         });
+    }
+
+    static List<Candle> mergeM1History(List<Candle> input, long nowMs) {
+        java.util.TreeMap<Long,Candle> unique = new java.util.TreeMap<>();
+        for (Candle c : input) {
+            if (c == null || c.timeframe != CandleTimeframe.M1 || c.isOpen
+                    || !CandleEngine.isValid(c, nowMs) || c.receivedAtMs < c.closeTimeMs()
+                    || c.receivedAtMs > nowMs
+                    || !("BiQuote OHLC REST".equals(c.source) || "BiQuote OHLC SQLite".equals(c.source))) continue;
+            Candle previous = unique.get(c.openTimeMs);
+            if (previous == null || c.receivedAtMs >= previous.receivedAtMs) unique.put(c.openTimeMs, c);
+        }
+        return new ArrayList<>(unique.values());
     }
 
     static List<Candle> aggregateClosedM1(List<Candle> input, CandleTimeframe target, long nowMs) {

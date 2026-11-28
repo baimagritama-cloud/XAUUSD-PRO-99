@@ -94,3 +94,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## SQLite gate 3/4 — integration and refresh accumulation
 - Integration commit c6c76fce0af616944b9a38b3e9c5c7b1f26ee1ad wired SQLite into activity and monitoring. CI not yet verified.
 - Native refresh merges closed bars by timestamp, retains latest 300 in memory, and keeps original history in SQLite. Newer received revisions update existing rows. Freshness uses only current network response, not restored history; failures clear freshness. No synthetic bars or HistData. Pending regression and database recovery tests. M2/M3 historical aggregation remains a separate gate.
+
+## SQLite gate 5 — M2/M3 historical aggregation
+- Gate 4 workflow 46116605463 succeeded; artifact 15251652898. Dedicated SQLite tests remain pending.
+- Merge up to 10000 stored native M1 bars with memory and latest REST response, validating source, timestamps and OHLC; prefer newest received duplicate. Existing complete aligned bucket algorithm retained. M2/M3 freshness inherits actual live M1 response; cache-only aggregation stays STALE. Pending CI and dedicated tests; 300 bars not yet demonstrated.

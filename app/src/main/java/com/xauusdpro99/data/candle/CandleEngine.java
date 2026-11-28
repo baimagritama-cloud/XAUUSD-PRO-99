@@ -88,6 +88,10 @@ public final class CandleEngine {
     }
 
     public synchronized void replaceAggregated(List<Candle> bars, long receivedAtMs, String sourceName) {
+        replaceAggregated(bars, receivedAtMs, sourceName, receivedAtMs);
+    }
+
+    public synchronized void replaceAggregated(List<Candle> bars, long receivedAtMs, String sourceName, long networkResponseAtMs) {
         if (!timeframe.isAggregatedFromM1()) throw new IllegalArgumentException("Bukan timeframe agregasi M1");
         TreeMap<Long, Candle> next = new TreeMap<>();
         int rejected = 0;
@@ -103,7 +107,7 @@ public final class CandleEngine {
         running = null;
         kind = DataKind.AGGREGATED;
         source = sourceName == null ? "Agregasi dari M1" : sourceName;
-        lastResponseAtMs = receivedAtMs;
+        lastResponseAtMs = next.isEmpty() ? 0 : networkResponseAtMs;
         rejectedCount = rejected;
     }
 
