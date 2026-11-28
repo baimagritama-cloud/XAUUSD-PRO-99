@@ -103,6 +103,22 @@ public final class CandleEngine {
         rejectedCount = rejected;
     }
 
+    /** Cache is historical only; never advances network freshness. */
+    public synchronized void restoreNativeHistory(List<Candle> bars, long nowMs) {
+        if (!timeframe.nativeSupported || bars == null) return;
+        for (Candle bar : bars) {
+            if (bar != null && bar.timeframe == timeframe && !bar.isOpen
+                    && "BiQuote OHLC SQLite".equals(bar.source) && isValid(bar, nowMs)
+                    && bar.receivedAtMs >= bar.closeTimeMs() && bar.receivedAtMs <= nowMs)
+                closed.putIfAbsent(bar.openTimeMs, bar);
+        }
+        while (closed.size() > RETAIN_CLOSED) closed.pollFirstEntry();
+        if (!closed.isEmpty() && lastResponseAtMs == 0) {
+            kind = DataKind.NATIVE;
+            source = "BiQuote OHLC SQLite (historical)";
+        }
+    }
+
     public synchronized Snapshot snapshot(long nowMs) {
         List<Candle> list = new ArrayList<>(closed.values());
         long latest = list.isEmpty() ? 0L : list.get(list.size() - 1).openTimeMs;
@@ -117,9 +133,9 @@ public final class CandleEngine {
             Candle lastClosed = list.get(list.size() - 1);
             candleFresh = nowMs - lastClosed.closeTimeMs() <= freshnessLimit;
         }
-        SourceStatus status = kind == DataKind.UNAVAILABLE || lastResponseAtMs == 0
+        SourceStatus status = kind == DataKind.UNAVAILABLE
                 ? SourceStatus.UNAVAILABLE
-                : (responseFresh && candleFresh ? SourceStatus.LIVE : SourceStatus.STALE);
+                : (lastResponseAtMs > 0 && responseFresh && candleFresh ? SourceStatus.LIVE : SourceStatus.STALE);
         return new Snapshot(timeframe, list, running, kind, status, source,
                 lastResponseAtMs, latest, rejectedCount, gaps);
     }

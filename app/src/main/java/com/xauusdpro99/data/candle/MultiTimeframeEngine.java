@@ -19,9 +19,15 @@ public final class MultiTimeframeEngine {
     private final BiquoteOhlcClient client = new BiquoteOhlcClient();
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Listener listener;
+    private final CandleStore store;
 
     public MultiTimeframeEngine(Listener listener) {
+        this(null, listener);
+    }
+
+    public MultiTimeframeEngine(android.content.Context context, Listener listener) {
         this.listener = listener;
+        this.store = context == null ? null : new CandleStore(context);
         for (CandleTimeframe tf : CandleTimeframe.values()) engines.put(tf, new CandleEngine(tf));
         for (CandleTimeframe tf : CandleTimeframe.values()) {
             if (!tf.nativeSupported && !tf.isAggregatedFromM1()) {
@@ -33,12 +39,23 @@ public final class MultiTimeframeEngine {
     public void refreshAll() {
         worker.execute(() -> {
             List<Candle> m1 = null;
+            if (store != null) {
+                for (CandleTimeframe tf : CandleTimeframe.values()) {
+                    if (!tf.nativeSupported) continue;
+                    try { engines.get(tf).restoreNativeHistory(store.loadNative(tf, CandleEngine.RETAIN_CLOSED, System.currentTimeMillis()), System.currentTimeMillis()); }
+                    catch (Exception error) { listener.onLog(tf + ": SQLite restore failed: " + error.getMessage()); }
+                }
+            }
             for (CandleTimeframe tf : CandleTimeframe.values()) {
                 if (!tf.nativeSupported) continue;
                 try {
                     List<Candle> bars = client.fetch(tf);
                     long received = System.currentTimeMillis();
                     engines.get(tf).replaceFromServer(bars, received, "BiQuote OHLC REST (" + tf.biquoteInterval + ")");
+                    if (store != null) {
+                        try { store.saveNative(tf, bars, received); }
+                        catch (Exception error) { listener.onLog(tf + ": SQLite save failed: " + error.getMessage()); }
+                    }
                     if (tf == CandleTimeframe.M1) m1 = bars;
                     listener.onLog(tf + ": respons " + bars.size() + " bar; disimpan "
                             + engines.get(tf).snapshot(received).closed.size() + " candle tertutup.");
@@ -116,5 +133,8 @@ public final class MultiTimeframeEngine {
         return Collections.unmodifiableMap(result);
     }
 
-    public void close() { worker.shutdownNow(); }
+    public void close() {
+        if (store != null && !worker.isShutdown()) worker.execute(store::close);
+        worker.shutdown();
+    }
 }

@@ -28,7 +28,7 @@ public final class CandleStore extends SQLiteOpenHelper {
         try {
             for(Candle c:bars) {
                 if(c==null || c.timeframe!=tf || c.isOpen || !CandleEngine.isValid(c,now) || !c.isClosedAt(now)) continue;
-                if(c.source==null || !c.source.startsWith("BiQuote")) continue;
+                if(!"BiQuote OHLC REST".equals(c.source) || c.receivedAtMs < c.closeTimeMs() || c.receivedAtMs > now) continue;
                 ContentValues v=new ContentValues();
                 v.put("tf",tf.name());v.put("ts",c.openTimeMs);
                 v.put("o",c.open);v.put("h",c.high);v.put("l",c.low);v.put("c",c.close);

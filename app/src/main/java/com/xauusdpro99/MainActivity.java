@@ -123,7 +123,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         backgroundMonitoring=monitoringPrefs.getBoolean("background_monitor_enabled",false);
         if(!backgroundMonitoring){
             engine = new BiquoteConnectionEngine(this);
-            candleEngine = new MultiTimeframeEngine(this);
+            candleEngine = new MultiTimeframeEngine(this, this);
         }
         MonitoringWorkScheduler.schedule(this);
         notificationCenter = new NotificationCenter(this);
@@ -248,7 +248,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             }catch(RuntimeException ex){
                 backgroundMonitoring=false;
                 monitoringPrefs.edit().putBoolean("background_monitor_enabled",false).apply();
-                engine=new BiquoteConnectionEngine(this);candleEngine=new MultiTimeframeEngine(this);engine.connect();
+                engine=new BiquoteConnectionEngine(this);candleEngine=new MultiTimeframeEngine(this, this);engine.connect();
                 monitoringStatus.setText("SERVICE GAGAL DIMULAI: "+ex.getClass().getSimpleName());
                 monitoringButton.setText("BACKGROUND MONITORING: NONAKTIF");
             }
@@ -600,7 +600,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             }catch(RuntimeException ex){
                 backgroundMonitoring=false;
                 monitoringPrefs.edit().putBoolean("background_monitor_enabled",false).apply();
-                engine=new BiquoteConnectionEngine(this);candleEngine=new MultiTimeframeEngine(this);engine.connect();
+                engine=new BiquoteConnectionEngine(this);candleEngine=new MultiTimeframeEngine(this, this);engine.connect();
                 monitoringStatus.setText("SERVICE GAGAL DIMULAI: "+ex.getClass().getSimpleName());
                 monitoringButton.setText("BACKGROUND MONITORING: NONAKTIF");
             }
@@ -609,7 +609,7 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
             monitoringPrefs.edit().putBoolean("background_monitor_enabled",false).apply();
             backgroundMonitoring=false;
             engine=new BiquoteConnectionEngine(this);
-            candleEngine=new MultiTimeframeEngine(this);
+            candleEngine=new MultiTimeframeEngine(this, this);
             engine.connect();
             monitoringStatus.setText("BACKGROUND MONITORING: NONAKTIF — koneksi aplikasi aktif");
             monitoringButton.setText("BACKGROUND MONITORING: NONAKTIF");

@@ -65,7 +65,7 @@ public final class MarketMonitoringService extends Service
         news=new EconomicNewsEngine();
         voice=new VoiceEngine(this,status->write("voice_status",status));
         quoteEngine=new BiquoteConnectionEngine(this);
-        candleEngine=new MultiTimeframeEngine(this);
+        candleEngine=new MultiTimeframeEngine(this, this);
         registerNetworkCallback();
         getSharedPreferences(RUNTIME,MODE_PRIVATE).edit().putBoolean("service_running",true)
             .putString("service_status","STARTING").putLong("service_started_at",System.currentTimeMillis()).apply();
