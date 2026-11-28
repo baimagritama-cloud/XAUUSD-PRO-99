@@ -1,0 +1,20 @@
+name: Dukascopy compatibility audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/audit_dukascopy.py'
+      - '.github/workflows/dukascopy-compatibility.yml'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/audit_dukascopy.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dukascopy-compatibility-metrics
+          path: artifacts/dukascopy-audit.json
+          if-no-files-found: error

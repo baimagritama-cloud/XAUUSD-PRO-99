@@ -126,3 +126,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## Historical depth remediation — provider limitation
 - Actual UI 46168061203 stage 5 reported 2014/3600; artifact 15273390263. Native counts match documented rolling windows exactly (D1 engine capped 300).
 - Official https://biquote.io/docs/ documents native intervals 1m/5m/15m/30m/1h/4h/1d and rolling limits 300/288/192/192/168/180/500. from/to documented, but historical range extension not established. Add independent bounded read-only range audit for all seven native intervals, including D1 observed weekday patterns. No new provider or production ingestion until evidence. W1 session calendar cannot be inferred from weekday patterns alone. CI pending.
+
+## Supplemental history research — Dukascopy compatibility
+- Range audit 46172014786 returned zero older candles on all seven intervals; artifact 15274210539. D1 includes 83 Sunday UTC records; W1 session boundaries not established.
+- Add bounded standalone BID/ASK M1/H1 compatibility audit, using candidate BI5 candle path and scale documented by third-party implementations, not assumed verified. Compare exact UTC overlaps and OHLC absolute median/p95/max differences; export aggregate metrics only. No production changes or licensing approval. Pending CI. D1/W1 depth and session validation remain separate targets.
