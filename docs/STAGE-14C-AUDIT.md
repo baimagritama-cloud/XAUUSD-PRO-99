@@ -90,3 +90,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 
 ## Gate 2 — historical chart separation
 - Runs 46108748907 (both attempts) failed at real chart level assertion; build passed. Live-only guards can suppress levels for stale closed candles. Chart-only methods now permit validated stale history, explicitly label STALE and preserve existing trading calculation entry points. No assertion removed. Pending CI; exact runtime cause not yet proven.
+
+## SQLite gate 3/4 — integration and refresh accumulation
+- Integration commit c6c76fce0af616944b9a38b3e9c5c7b1f26ee1ad wired SQLite into activity and monitoring. CI not yet verified.
+- Native refresh merges closed bars by timestamp, retains latest 300 in memory, and keeps original history in SQLite. Newer received revisions update existing rows. Freshness uses only current network response, not restored history; failures clear freshness. No synthetic bars or HistData. Pending regression and database recovery tests. M2/M3 historical aggregation remains a separate gate.

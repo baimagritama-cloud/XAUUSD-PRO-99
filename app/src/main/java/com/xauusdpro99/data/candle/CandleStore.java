@@ -33,7 +33,8 @@ public final class CandleStore extends SQLiteOpenHelper {
                 v.put("tf",tf.name());v.put("ts",c.openTimeMs);
                 v.put("o",c.open);v.put("h",c.high);v.put("l",c.low);v.put("c",c.close);
                 v.put("volume",c.volume);v.put("ticks",c.tickVolume);v.put("received",c.receivedAtMs);
-                db.insertWithOnConflict(TABLE,null,v,SQLiteDatabase.CONFLICT_IGNORE);
+                int updated = db.update(TABLE,v,"tf=? AND ts=? AND received<?",new String[]{tf.name(),Long.toString(c.openTimeMs),Long.toString(c.receivedAtMs)});
+                if(updated==0) db.insertWithOnConflict(TABLE,null,v,SQLiteDatabase.CONFLICT_IGNORE);
             }
             db.setTransactionSuccessful();
         } finally {db.endTransaction();}

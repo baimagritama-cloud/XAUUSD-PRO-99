@@ -48,11 +48,15 @@ public final class CandleEngine {
     private String source = "Belum ada sumber";
     private long lastResponseAtMs;
     private int rejectedCount;
+    private long latestResponseClosedAtMs;
 
     public CandleEngine(CandleTimeframe timeframe) { this.timeframe = timeframe; }
 
     public synchronized void markUnavailable(String reason) {
-        if (lastResponseAtMs == 0) kind = DataKind.UNAVAILABLE;
+        lastResponseAtMs = 0;
+        latestResponseClosedAtMs = 0;
+        running = null;
+        if (closed.isEmpty()) kind = DataKind.UNAVAILABLE;
         source = reason == null ? "Tidak tersedia" : reason;
     }
 
@@ -73,13 +77,13 @@ public final class CandleEngine {
                 }
             }
         }
-        while (nextClosed.size() > RETAIN_CLOSED) nextClosed.pollFirstEntry();
-        closed.clear();
+        latestResponseClosedAtMs = nextClosed.isEmpty() ? 0 : nextClosed.lastEntry().getValue().closeTimeMs();
         closed.putAll(nextClosed);
+        while (closed.size() > RETAIN_CLOSED) closed.pollFirstEntry();
         running = nextRunning;
         kind = DataKind.NATIVE;
         source = sourceName == null ? "BiQuote OHLC REST" : sourceName;
-        lastResponseAtMs = receivedAtMs;
+        lastResponseAtMs = (nextRunning != null || latestResponseClosedAtMs > 0) ? receivedAtMs : 0;
         rejectedCount = rejected;
     }
 
@@ -129,9 +133,11 @@ public final class CandleEngine {
         long freshnessLimit = Math.max(120_000L, timeframe.durationMs * 2L);
         boolean responseFresh = nowMs >= lastResponseAtMs && nowMs - lastResponseAtMs <= freshnessLimit;
         boolean candleFresh = running != null && running.openTimeMs <= nowMs && running.closeTimeMs() > nowMs;
-        if (!candleFresh && !list.isEmpty()) {
-            Candle lastClosed = list.get(list.size() - 1);
-            candleFresh = nowMs - lastClosed.closeTimeMs() <= freshnessLimit;
+        if (!candleFresh && kind == DataKind.NATIVE) {
+            candleFresh = latestResponseClosedAtMs > 0 && nowMs >= latestResponseClosedAtMs
+                    && nowMs - latestResponseClosedAtMs <= freshnessLimit;
+        } else if (!candleFresh && !list.isEmpty()) {
+            candleFresh = nowMs - list.get(list.size() - 1).closeTimeMs() <= freshnessLimit;
         }
         SourceStatus status = kind == DataKind.UNAVAILABLE
                 ? SourceStatus.UNAVAILABLE
