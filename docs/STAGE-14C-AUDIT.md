@@ -130,3 +130,6 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## Supplemental history research — Dukascopy compatibility
 - Range audit 46172014786 returned zero older candles on all seven intervals; artifact 15274210539. D1 includes 83 Sunday UTC records; W1 session boundaries not established.
 - Add bounded standalone BID/ASK M1/H1 compatibility audit, using candidate BI5 candle path and scale documented by third-party implementations, not assumed verified. Compare exact UTC overlaps and OHLC absolute median/p95/max differences; export aggregate metrics only. No production changes or licensing approval. Pending CI. D1/W1 depth and session validation remain separate targets.
+
+## Dukascopy audit remediation
+- Run 46172419394 returned zero candidate bars (timeouts, HTTP 503/404); artifact 15274810098. No compatibility evidence. Add completed April 2024 BID M1/H1 controls, bounded retry with exponential backoff for transient network/HTTP failures, path diagnostics, and explicit failing exit when controls or exact overlap unavailable. Do not retry 404. Reference historical path format: https://github.com/Leo4815162342/dukascopy-node/discussions/173. Current partial month may still lack H1 data; no inferred endpoint or production change. Pending CI; licensing and actual compatibility remain open.
