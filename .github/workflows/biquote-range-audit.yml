@@ -1,0 +1,21 @@
+name: BiQuote historical range audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/biquote-range-audit.py'
+      - '.github/workflows/biquote-range-audit.yml'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/biquote-range-audit.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: biquote-range-audit
+          path: range-audit/
