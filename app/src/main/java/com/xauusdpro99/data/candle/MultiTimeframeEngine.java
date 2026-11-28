@@ -163,7 +163,7 @@ public final class MultiTimeframeEngine {
             long tickVolume = 0L;
             for (int j = 0; j < groupSize; j++) {
                 Candle part = m1.get(i + j);
-                if (part.openTimeMs != bucket + j * CandleTimeframe.M1.durationMs) {
+                if (part.openTimeMs != bucket + j * CandleTimeframe.M1.durationMs || Long.MAX_VALUE - tickVolume < part.tickVolume) {
                     complete = false; break;
                 }
                 high = Math.max(high, part.high);
@@ -173,8 +173,9 @@ public final class MultiTimeframeEngine {
             }
             if (complete && bucket + target.durationMs <= nowMs) {
                 Candle last = m1.get(i + groupSize - 1);
-                output.add(new Candle("XAUUSD", target, bucket, first.open, high, low, last.close,
-                        volume, tickVolume, false, "AGGREGATED dari BiQuote M1", nowMs));
+                Candle bar = new Candle("XAUUSD", target, bucket, first.open, high, low, last.close,
+                        volume, tickVolume, false, "AGGREGATED dari BiQuote M1", nowMs);
+                if (CandleEngine.isValid(bar, nowMs)) output.add(bar);
                 i += groupSize;
             } else {
                 i++;

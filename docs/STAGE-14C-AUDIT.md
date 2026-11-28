@@ -110,3 +110,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## SQLite gate 8 — recovery instrumentation
 - Gate 7 UI 46121312359 succeeded; artifact 15253967399. W1 session verification remains open.
 - Validate persisted reception timestamps on load. Add isolated on-device SQLite reopen test (separate test DB), duplicate/revision checks, invalid/running rejection, 300-bar retention and STALE after restore/network failure. Append stage 4 to existing orchestrated workflow; no previous assertions removed. Pending CI. Actual process death/device reboot and physical network interruption not yet tested; no destructive database recovery introduced.
+
+## SQLite gate 9 — deterministic regression tests
+- Gate 8 workflow 46123083254 succeeded, artifact 15255370527. Physical reboot/network interruption remain unverified.
+- Add JVM regression tests for all derived timeframes, 300-bar caps, incomplete groups, cache provenance, stale status, OHLC, revisions and overflow. Fix older native revisions overwriting newer memory bars, M1 aggregation overflow and W1 freshness bypass. Fixtures are test-only, not market evidence. CI pending.

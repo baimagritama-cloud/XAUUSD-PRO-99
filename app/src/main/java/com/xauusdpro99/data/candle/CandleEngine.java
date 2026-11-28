@@ -71,14 +71,19 @@ public final class CandleEngine {
                 if (c.isOpen) {
                     if (nextRunning == null || c.openTimeMs > nextRunning.openTimeMs) nextRunning = c;
                 } else if (c.isClosedAt(receivedAtMs)) {
-                    if (nextClosed.put(c.openTimeMs, c) != null) rejected++;
+                    Candle previous = nextClosed.get(c.openTimeMs);
+                    if (previous != null) rejected++;
+                    if (previous == null || c.receivedAtMs >= previous.receivedAtMs) nextClosed.put(c.openTimeMs, c);
                 } else {
                     rejected++;
                 }
             }
         }
         latestResponseClosedAtMs = nextClosed.isEmpty() ? 0 : nextClosed.lastEntry().getValue().closeTimeMs();
-        closed.putAll(nextClosed);
+        for (Candle bar : nextClosed.values()) {
+            Candle previous = closed.get(bar.openTimeMs);
+            if (previous == null || bar.receivedAtMs >= previous.receivedAtMs) closed.put(bar.openTimeMs, bar);
+        }
         while (closed.size() > RETAIN_CLOSED) closed.pollFirstEntry();
         running = nextRunning;
         kind = DataKind.NATIVE;
@@ -107,7 +112,7 @@ public final class CandleEngine {
         running = null;
         kind = DataKind.AGGREGATED;
         source = sourceName == null ? "Agregasi dari M1" : sourceName;
-        lastResponseAtMs = next.isEmpty() ? 0 : networkResponseAtMs;
+        lastResponseAtMs = next.isEmpty() || timeframe == CandleTimeframe.W1 || networkResponseAtMs > receivedAtMs ? 0 : networkResponseAtMs;
         rejectedCount = rejected;
     }
 
