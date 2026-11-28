@@ -30,7 +30,7 @@ public final class MultiTimeframeEngine {
         this.store = context == null ? null : new CandleStore(context);
         for (CandleTimeframe tf : CandleTimeframe.values()) engines.put(tf, new CandleEngine(tf));
         for (CandleTimeframe tf : CandleTimeframe.values()) {
-            if (!tf.nativeSupported && !tf.isAggregatedFromM1() && !tf.isAggregatedFromH4()) {
+            if (!tf.nativeSupported && !tf.isAggregatedFromM1() && !tf.isAggregatedFromH4() && !tf.isAggregatedFromD1()) {
                 engines.get(tf).markUnavailable("UNSUPPORTED — interval tidak tercantum pada dokumentasi BiQuote");
             }
         }
@@ -40,6 +40,7 @@ public final class MultiTimeframeEngine {
         worker.execute(() -> {
             List<Candle> m1 = null;
             List<Candle> h4 = null;
+            List<Candle> d1 = null;
             if (store != null) {
                 for (CandleTimeframe tf : CandleTimeframe.values()) {
                     if (!tf.nativeSupported) continue;
@@ -59,6 +60,7 @@ public final class MultiTimeframeEngine {
                     }
                     if (tf == CandleTimeframe.M1) m1 = bars;
                     if (tf == CandleTimeframe.H4) h4 = bars;
+                    if (tf == CandleTimeframe.D1) d1 = bars;
                     listener.onLog(tf + ": respons " + bars.size() + " bar; disimpan "
                             + engines.get(tf).snapshot(received).closed.size() + " candle tertutup.");
                 } catch (Exception error) {
@@ -106,6 +108,23 @@ public final class MultiTimeframeEngine {
                 }
                 listener.onLog(tf + ": hasil agregasi H4 lengkap " + aggregated.size() + " candle.");
             }
+            long weekNow = System.currentTimeMillis();
+            List<Candle> dailyHistory = new ArrayList<>();
+            if (store != null) {
+                try { dailyHistory.addAll(store.loadNative(CandleTimeframe.D1, 10000, weekNow)); }
+                catch (Exception error) { listener.onLog("D1: SQLite weekly history failed: " + error.getMessage()); }
+            }
+            dailyHistory.addAll(engines.get(CandleTimeframe.D1).snapshot(weekNow).closed);
+            if (d1 != null) dailyHistory.addAll(d1);
+            List<Candle> weekly = aggregateClosedD1(dailyHistory, weekNow);
+            if (weekly.isEmpty()) {
+                engines.get(CandleTimeframe.W1).markUnavailable("W1: tidak ada minggu D1 lengkap sesuai aturan UTC");
+            } else {
+                // Conservative historical approximation until provider session calendar is verified.
+                engines.get(CandleTimeframe.W1).replaceAggregated(weekly, weekNow,
+                        "AGGREGATED D1 Senin-Jumat UTC; kalender sesi belum terverifikasi", 0);
+            }
+            listener.onLog("W1: " + weekly.size() + " minggu historis; kalender sesi belum terverifikasi.");
             listener.onUpdated(snapshotAll(System.currentTimeMillis()));
         });
     }
@@ -200,6 +219,45 @@ public final class MultiTimeframeEngine {
             if (!complete) continue;
             Candle bar = new Candle("XAUUSD", target, start, first.open, high, low, last.close,
                     volume, ticks, false, "AGGREGATED dari BiQuote H4", received);
+            if (CandleEngine.isValid(bar, nowMs)) output.add(bar);
+        }
+        return new ArrayList<>(output.subList(Math.max(0, output.size() - CandleEngine.RETAIN_CLOSED), output.size()));
+    }
+
+    static List<Candle> aggregateClosedD1(List<Candle> input, long nowMs) {
+        java.util.TreeMap<Long,Candle> unique = new java.util.TreeMap<>();
+        long day = CandleTimeframe.D1.durationMs;
+        for (Candle c : input) {
+            if (c == null || c.timeframe != CandleTimeframe.D1 || c.isOpen
+                    || !CandleEngine.isValid(c, nowMs) || c.receivedAtMs < c.closeTimeMs()
+                    || c.receivedAtMs > nowMs
+                    || !("BiQuote OHLC REST".equals(c.source) || "BiQuote OHLC SQLite".equals(c.source))) continue;
+            Candle previous = unique.get(c.openTimeMs);
+            if (previous == null || c.receivedAtMs >= previous.receivedAtMs) unique.put(c.openTimeMs, c);
+        }
+        List<Candle> output = new ArrayList<>();
+        for (Candle first : unique.values()) {
+            long start = first.openTimeMs;
+            if (!CandleTimeframe.W1.isAligned(start) || start + CandleTimeframe.W1.durationMs > nowMs) continue;
+            // Do not silently omit weekend bars or guess holiday closures.
+            if (unique.containsKey(start + 5 * day) || unique.containsKey(start + 6 * day)) continue;
+            double high = first.high, low = first.low, volume = 0;
+            long ticks = 0, received = 0;
+            Candle last = first;
+            boolean complete = true;
+            for (int i = 0; i < 5; i++) {
+                Candle part = unique.get(start + i * day);
+                if (part == null || Long.MAX_VALUE - ticks < part.tickVolume) { complete = false; break; }
+                high = Math.max(high, part.high);
+                low = Math.min(low, part.low);
+                volume += part.volume;
+                ticks += part.tickVolume;
+                received = Math.max(received, part.receivedAtMs);
+                last = part;
+            }
+            if (!complete) continue;
+            Candle bar = new Candle("XAUUSD", CandleTimeframe.W1, start, first.open, high, low, last.close,
+                    volume, ticks, false, "AGGREGATED D1 Senin-Jumat UTC (historical)", received);
             if (CandleEngine.isValid(bar, nowMs)) output.add(bar);
         }
         return new ArrayList<>(output.subList(Math.max(0, output.size() - CandleEngine.RETAIN_CLOSED), output.size()));

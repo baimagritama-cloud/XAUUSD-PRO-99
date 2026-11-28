@@ -102,3 +102,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## SQLite gate 6 — H8/H12 aggregation
 - Gate 5 workflow 46118825963 succeeded; artifact 15252773856. Actual 300 M2/M3 not yet verified.
 - H8/H12 use complete UTC-aligned groups of two/three validated native H4 bars from REST, SQLite (up to 10000) and memory. Reject missing groups, invalid source/time/OHLC and overflow. Preserve actual source reception time and inherit H4 freshness. W1 unchanged. Pending CI and dedicated tests; actual 300 H8/H12 not established.
+
+## SQLite gate 7 — conservative W1 history
+- Gate 6 build 46119659663 and UI 46119659632 succeeded on e31c00af456e539e383d3cc7451de2b289abc96b.
+- Native W1 interval remains undocumented in audited client; no guessed endpoint. Aggregate only closed Monday-Friday UTC D1 groups with no weekend bars, validated source/time/OHLC, deduplication and overflow checks. Reject incomplete/holiday weeks rather than inventing bars. Read up to 10000 stored D1 bars. W1 stays historical STALE pending provider session-calendar verification; 300 weeks and native equivalence not established. CI and targeted tests pending.
