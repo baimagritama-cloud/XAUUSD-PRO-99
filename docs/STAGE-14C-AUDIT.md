@@ -98,3 +98,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## SQLite gate 5 — M2/M3 historical aggregation
 - Gate 4 workflow 46116605463 succeeded; artifact 15251652898. Dedicated SQLite tests remain pending.
 - Merge up to 10000 stored native M1 bars with memory and latest REST response, validating source, timestamps and OHLC; prefer newest received duplicate. Existing complete aligned bucket algorithm retained. M2/M3 freshness inherits actual live M1 response; cache-only aggregation stays STALE. Pending CI and dedicated tests; 300 bars not yet demonstrated.
+
+## SQLite gate 6 — H8/H12 aggregation
+- Gate 5 workflow 46118825963 succeeded; artifact 15252773856. Actual 300 M2/M3 not yet verified.
+- H8/H12 use complete UTC-aligned groups of two/three validated native H4 bars from REST, SQLite (up to 10000) and memory. Reject missing groups, invalid source/time/OHLC and overflow. Preserve actual source reception time and inherit H4 freshness. W1 unchanged. Pending CI and dedicated tests; actual 300 H8/H12 not established.

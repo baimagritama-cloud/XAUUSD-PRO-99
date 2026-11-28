@@ -19,6 +19,8 @@ public enum CandleTimeframe {
 
     public boolean isAggregatedFromM1() { return this == M2 || this == M3; }
 
+    public boolean isAggregatedFromH4() { return this == H8 || this == H12; }
+
     public boolean isAligned(long epochMs) {
         if (this == W1) return Math.floorMod(epochMs + 3L * 86_400_000L, durationMs) == 0L;
         return Math.floorMod(epochMs, durationMs) == 0L;

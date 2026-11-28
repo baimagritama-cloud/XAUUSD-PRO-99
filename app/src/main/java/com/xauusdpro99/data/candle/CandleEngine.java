@@ -92,7 +92,7 @@ public final class CandleEngine {
     }
 
     public synchronized void replaceAggregated(List<Candle> bars, long receivedAtMs, String sourceName, long networkResponseAtMs) {
-        if (!timeframe.isAggregatedFromM1()) throw new IllegalArgumentException("Bukan timeframe agregasi M1");
+        if (!timeframe.isAggregatedFromM1() && !timeframe.isAggregatedFromH4()) throw new IllegalArgumentException("Bukan timeframe agregasi");
         TreeMap<Long, Candle> next = new TreeMap<>();
         int rejected = 0;
         if (bars != null) for (Candle c : bars) {
