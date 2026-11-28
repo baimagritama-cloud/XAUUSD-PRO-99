@@ -250,4 +250,12 @@ start_live_evidence_capture stage4
 run_orchestrated stage4 restoresClosedHistoryWithoutLiveFeed com.xauusdpro99.data.candle.CandleStoreRecoveryTest
 stop_live_evidence_capture
 echo "STAGE 4 PASSED: SQLite reopen and offline freshness assertions."
-echo "ALL STAGES PASSED."
+wait_for_stable_framework stage5
+start_live_evidence_capture stage5
+run_orchestrated stage5 auditActualHistory com.xauusdpro99.data.candle.ActualHistoryAuditTest
+stop_live_evidence_capture
+adb logcat -b all -d -v threadtime > artifacts/diagnostics/stage5-logcat.txt
+adb exec-out run-as com.xauusdpro99 cat cache/actual-history-audit.tsv > artifacts/diagnostics/actual-history-audit.tsv
+test "$(wc -l < artifacts/diagnostics/actual-history-audit.tsv)" -eq 14
+cat artifacts/diagnostics/actual-history-audit.tsv
+echo "ALL INSTRUMENTATION STAGES PASSED; history capacity acceptance is reported separately."
