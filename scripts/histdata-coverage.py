@@ -145,6 +145,22 @@ def audit():
         calendar_classes[kind]+=1
         all_gaps.append({'previous_utc':a,'next_utc':b,'missing_minutes':missing,'conflicting_minutes':q,'provider_overlap':overlap,'classification':kind,'closure_verified':False})
     if len(all_gaps)!=gaps['observed'] or sum(calendar_classes.values())!=len(all_gaps):raise ValueError('All gap reconciliation failed')
+    # New York civil-time comparison, NOT a certified trading schedule.
+    from zoneinfo import ZoneInfo
+    ny=ZoneInfo('America/New_York')
+    patterns=Counter(); details=[]
+    for g in all_gaps:
+        a=datetime.datetime.fromtimestamp(g['previous_utc'],ny)
+        b=datetime.datetime.fromtimestamp(g['next_utc'],ny)
+        if g['classification'] not in ('WEEKEND_CANDIDATE','DAILY_PAUSE_CANDIDATE'):continue
+        key=(g['classification'],a.strftime('%a %H:%M'),b.strftime('%a %H:%M'),str(a.utcoffset()),str(b.utcoffset()))
+        patterns[key]+=1
+        details.append({**g,'new_york_previous':a.isoformat(),'new_york_next':b.isoformat(),'status':'UNVERIFIED_SCHEDULE_PATTERN'})
+    if len(details)!=calendar_classes['WEEKEND_CANDIDATE']+calendar_classes['DAILY_PAUSE_CANDIDATE']:raise ValueError('Schedule candidate reconciliation failed')
+    pattern_rows=[{'classification':k[0],'previous_local':k[1],'next_local':k[2],'previous_offset':k[3],'next_offset':k[4],'count':v} for k,v in patterns.most_common()]
+    (out/'schedule-candidate-patterns.json').write_text(json.dumps({'intervals':details,'patterns':pattern_rows},indent=2))
+    report['histdata']['schedule_pattern_audit']={'candidates':len(details),'distinct_patterns':len(pattern_rows),'top_patterns':pattern_rows[:12],'verified_closures':0,'calendar_verified':False,'source':'https://www.histdata.com/f-a-q/','note':'Source documents fixed EST timestamps and bid OHLC, not historical XAUUSD trading hours. New York timezone is diagnostic only.'}
+    print(json.dumps({'schedule_pattern_audit':report['histdata']['schedule_pattern_audit']}),flush=True)
     (out/'all-calendar-gaps.json').write_text(json.dumps(all_gaps,indent=2))
     report['histdata']['calendar_evidence_audit']={'classes':dict(calendar_classes),'total':len(all_gaps),'verified_closures':0,'calendar_verified':False,'status':'SOURCE_SPECIFIC_HISTORICAL_CALENDAR_REQUIRED'}
     print(json.dumps({'calendar_evidence_audit':report['histdata']['calendar_evidence_audit']}),flush=True)
