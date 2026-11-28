@@ -78,6 +78,42 @@ def audit():
             if not st['valid']: raise ValueError('No valid rows')
         except Exception as e: st['error']=str(e)
         print(json.dumps(st),flush=True);(out/'report.json').write_text(json.dumps(report,indent=2));time.sleep(1)
+    # Read-only BiQuote audit; never blend BID and MID candles.
+    import statistics
+    native={}
+    for interval,minutes in [('1m',1),('5m',5),('15m',15),('30m',30),('1h',60),('4h',240),('1d',1440)]:
+        q={'interval':interval,'limit':1000}
+        item={'interval':interval,'price_basis':'MID','histdata_basis':'BID'}
+        try:
+            url='https://biquote.io/api/XAUUSD/ohlc?'+urllib.parse.urlencode(q)
+            _,status,raw=get(url)
+            obj=json.loads(raw)
+            if obj.get('symbol')!='XAUUSD' or obj.get('interval')!=interval:raise ValueError('Unexpected envelope')
+            rows={};invalid=0;duplicates=0;running=0
+            for bar in obj['bars']:
+                try:
+                    t=datetime.datetime.fromisoformat(bar['openTime'].replace('Z','+00:00'))
+                    if t.tzinfo is None:raise ValueError()
+                    ts=int(t.timestamp());v=tuple(float(bar[k]) for k in ('open','high','low','close'))
+                    if ts%(minutes*60) or not all(math.isfinite(x) and x>0 for x in v) or v[1]<max(v[0],v[3]) or v[2]>min(v[0],v[3]) or type(bar.get('isOpen')) is not bool:raise ValueError()
+                    if bar['isOpen']:running+=1;continue
+                    if ts+minutes*60>now.timestamp():raise ValueError()
+                    if ts in rows:duplicates+=1;continue
+                    rows[ts]=v
+                except (ValueError,TypeError,KeyError):invalid+=1
+            differences=[]
+            for ts,v in sorted(rows.items()):
+                keys=range(ts,ts+minutes*60,60)
+                if not all(k in seen and k not in conflicts for k in keys):continue
+                hs=[seen[k] for k in keys]
+                hv=(hs[0][0],max(x[1] for x in hs),min(x[2] for x in hs),hs[-1][3])
+                differences.append([v[i]-hv[i] for i in range(4)])
+            item.update(http=status,closed=len(rows),running=running,invalid=invalid,duplicates=duplicates,first_utc=min(rows,default=None),last_utc=max(rows,default=None),overlap_complete_m1_buckets=len(differences),median_absolute_difference={k:statistics.median(abs(d[i]) for d in differences) for i,k in enumerate(('open','high','low','close'))} if differences else None)
+        except Exception as e:item['error']=str(e)
+        native[interval]=item
+    report['histdata']['biquote_native_audit']={'native':native,'unsupported_documented':['2m','3m','8h','12h','1w'],'source':'https://biquote.io/docs/','merge_authorized':False}
+    (out/'biquote-native-audit.json').write_text(json.dumps(report['histdata']['biquote_native_audit'],indent=2))
+    print(json.dumps({'biquote_native_audit':report['histdata']['biquote_native_audit']}),flush=True)
     # Provider reports describe tick gaps, not verified exchange closures.
     from collections import Counter
     import bisect
