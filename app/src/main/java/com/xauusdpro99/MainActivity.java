@@ -535,7 +535,9 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
                     connectionStatus == BiquoteConnectionEngine.Status.LIVE, quoteValid,
                     latestQuoteReceivedAtMs, System.currentTimeMillis(), snapshots,
                     indicatorResults, structureResults, supplyResults, patternResults));
-            StringBuilder journeyText = new StringBuilder("MARKET JOURNEY — DATA AKTUAL\n");
+            StringBuilder journeyText = new StringBuilder("MARKET JOURNEY — ")
+                    .append(journey.dataValid ? "DATA AKTUAL" : "DATA TIDAK VALID / BUKAN LIVE")
+                    .append("\n");
             journeyText.append("Harga=").append(fmt(journey.currentPrice)).append(" | Arah=").append(journey.mainDirection)
                     .append(" | State=").append(journey.state).append(" | Area=").append(journey.safety)
                     .append("\nPosisi=").append(journey.position).append("\nDemand=").append(journey.nearestDemand)

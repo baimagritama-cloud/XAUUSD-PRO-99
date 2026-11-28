@@ -133,3 +133,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 
 ## Dukascopy audit remediation
 - Run 46172419394 returned zero candidate bars (timeouts, HTTP 503/404); artifact 15274810098. No compatibility evidence. Add completed April 2024 BID M1/H1 controls, bounded retry with exponential backoff for transient network/HTTP failures, path diagnostics, and explicit failing exit when controls or exact overlap unavailable. Do not retry 404. Reference historical path format: https://github.com/Leo4815162342/dukascopy-node/discussions/173. Current partial month may still lack H1 data; no inferred endpoint or production change. Pending CI; licensing and actual compatibility remain open.
+
+## Gate 3 — Market Journey freshness label
+- HEAD 285474522d4b6304d27fb9352db86aa3c2adc9fb: Build 46173025110 and UI 46173025135 passed; six instrumentation invocations, 12 screenshots captured, monitoring and SQLite assertions passed. UI artifact 15274134839; latest images not visually reinspected. Dukascopy audit 46173025117 failed, artifact 15275035598; no provider integration or rerun.
+- Source audit found unconditional DATA AKTUAL heading despite journey.dataValid=false. Derive heading from existing engine validity; preserve all calculations and invalidation text. Pending CI and visual verification; no gate closed.
