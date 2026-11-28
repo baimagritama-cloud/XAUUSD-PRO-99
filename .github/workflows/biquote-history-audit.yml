@@ -1,0 +1,20 @@
+name: BiQuote historical depth audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/audit_biquote_history.py'
+      - '.github/workflows/biquote-history-audit.yml'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/audit_biquote_history.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: biquote-historical-depth
+          path: artifacts/history-depth.json
+          if-no-files-found: error

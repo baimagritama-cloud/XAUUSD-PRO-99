@@ -122,3 +122,7 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## SQLite gate 10/11 — final build and actual-history evidence
 - Gate 10 build 46124163652 passed on 0d0c1da8a22148b49ae565beffe568e39a6c48d6; APK artifact 15254558409. UI 46165831406 passed on documentation-only 3b9e1b222603f67dbd824f104a9299f0e820f4e1; artifact 15270824363.
 - Gate 11 adds a production REST/SQLite snapshot audit for all 12 timeframes with counts, deficits, source, freshness, timestamps and integrity assertions. Capacity acceptance is separate from instrumentation success; no fabricated history, no changes to existing UI assertions. W1 calendar and physical reboot remain open. Pending CI.
+
+## Historical depth remediation — provider limitation
+- Actual UI 46168061203 stage 5 reported 2014/3600; artifact 15273390263. Native counts match documented rolling windows exactly (D1 engine capped 300).
+- Official https://biquote.io/docs/ documents native intervals 1m/5m/15m/30m/1h/4h/1d and rolling limits 300/288/192/192/168/180/500. from/to documented, but historical range extension not established. Add independent bounded read-only range audit for all seven native intervals, including D1 observed weekday patterns. No new provider or production ingestion until evidence. W1 session calendar cannot be inferred from weekday patterns alone. CI pending.
