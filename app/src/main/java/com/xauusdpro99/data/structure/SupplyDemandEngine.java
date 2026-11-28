@@ -37,7 +37,14 @@ public final class SupplyDemandEngine {
     }
     private static final int BASE_MAX=3, IMPULSE_LOOKAHEAD=3;
     public Result analyze(CandleEngine.Snapshot snapshot,double currentPrice,long nowMs){
-        if(snapshot==null||snapshot.sourceStatus!=CandleEngine.SourceStatus.LIVE||!Double.isFinite(currentPrice)||currentPrice<=0)
+        return analyzeInternal(snapshot,currentPrice,nowMs,false);
+    }
+    /** Historical chart only; never use for trading signals. */
+    public Result analyzeForChart(CandleEngine.Snapshot snapshot,double currentPrice,long nowMs){
+        return analyzeInternal(snapshot,currentPrice,nowMs,true);
+    }
+    private Result analyzeInternal(CandleEngine.Snapshot snapshot,double currentPrice,long nowMs,boolean chartOnly){
+        if(snapshot==null||(snapshot.sourceStatus!=CandleEngine.SourceStatus.LIVE && !(chartOnly && snapshot.sourceStatus==CandleEngine.SourceStatus.STALE))||!Double.isFinite(currentPrice)||currentPrice<=0)
             return new Result(snapshot==null?"UNKNOWN":snapshot.timeframe.name(),new ArrayList<>(),new ArrayList<>(),nowMs,"DATA NOT LIVE / INVALID PRICE");
         List<Candle>b=new ArrayList<>();
         for(Candle c:snapshot.closed)if(c!=null&&!c.isOpen&&c.timeframe==snapshot.timeframe&&c.isClosedAt(nowMs)&&CandleEngine.isValid(c,nowMs))b.add(c);
@@ -65,7 +72,7 @@ public final class SupplyDemandEngine {
             if(!duplicate){Zone z=evaluateZone("Z"+(++serial),snapshot.timeframe.name(),type,top,bottom,formed,b,impulseIndex,atr,tol,currentPrice,nowMs,events);zones.add(z);}
             i=baseEnd;
         }
-        return new Result(snapshot.timeframe.name(),zones,events,nowMs,"VALID CLOSED OHLC; base <= "+BASE_MAX+" candles; displacement >= 0.8 ATR");
+        return new Result(snapshot.timeframe.name(),zones,events,nowMs,(snapshot.sourceStatus==CandleEngine.SourceStatus.STALE?"STALE HISTORICAL CHART ONLY; ":"")+"VALID CLOSED OHLC; base <= "+BASE_MAX+" candles; displacement >= 0.8 ATR");
     }
     private static Zone evaluateZone(String id,String tf,ZoneType type,double top,double bottom,long formed,List<Candle>b,
                                      int impulse,double atr,double tol,double price,long now,List<Breakout> events){

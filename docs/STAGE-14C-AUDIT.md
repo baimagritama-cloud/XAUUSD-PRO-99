@@ -87,3 +87,6 @@ No trading engine or feature removal. Do not mark Stage 14C complete until evide
 ## Gate 2 — portrait label gesture recovery
 - Run 46019013582 on 43a2f3fa6e6df8e5879fab4d477f4c32f9bff6e7: build/unit and landscape passed; portrait failed at `Chart missing after label drag`; later integration stages not executed. Artifact 15206924695. MainActivity live chart is not nested in a ScrollView. Exact cause not proven from job log alone.
 - Make chart accessibility identity stable at construction instead of resetting it during draw. Wait for native visible/focused chart after dialog dismissal and drag, refresh touch coordinates, retain accessibility assertion and positive/negative dialog checks. Pending CI; no pass claimed.
+
+## Gate 2 — historical chart separation
+- Runs 46108748907 (both attempts) failed at real chart level assertion; build passed. Live-only guards can suppress levels for stale closed candles. Chart-only methods now permit validated stale history, explicitly label STALE and preserve existing trading calculation entry points. No assertion removed. Pending CI; exact runtime cause not yet proven.

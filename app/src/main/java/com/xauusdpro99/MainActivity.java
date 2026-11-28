@@ -271,13 +271,13 @@ public final class MainActivity extends Activity implements BiquoteConnectionEng
         double sup=Double.NaN,res=Double.NaN;
         if(snap!=null){
             double current=snap.closed.isEmpty()?Double.NaN:snap.closed.get(snap.closed.size()-1).close;
-            SupplyDemandEngine.Result z=new SupplyDemandEngine().analyze(snap,current,System.currentTimeMillis());
+            SupplyDemandEngine.Result z=new SupplyDemandEngine().analyzeForChart(snap,current,System.currentTimeMillis());
             for(SupplyDemandEngine.Zone item:z.activeZones())zones.add(new LiveCandleChartView.Zone(item.lower,item.upper,item.type==SupplyDemandEngine.ZoneType.DEMAND,item.label));
-            IndicatorEngine.Result ir=new IndicatorEngine().calculate(snap,latestSnapshots.get(CandleTimeframe.D1),System.currentTimeMillis());
+            IndicatorEngine.Result ir=new IndicatorEngine().calculateForChart(snap,latestSnapshots.get(CandleTimeframe.D1),System.currentTimeMillis());
             if(!ir.swingSupports.isEmpty())sup=ir.swingSupports.get(ir.swingSupports.size()-1);
             if(!ir.swingResistances.isEmpty())res=ir.swingResistances.get(ir.swingResistances.size()-1);
         }
-        chartView.setData(snap==null?java.util.Collections.emptyList():snap.closed,zones,selectedTimeframe.name(),sup,res);
+        chartView.setData(snap==null?java.util.Collections.emptyList():snap.closed,zones,selectedTimeframe.name()+(snap!=null && snap.sourceStatus==CandleEngine.SourceStatus.STALE?" | STALE HISTORIS":""),sup,res);
         chartView.setEma(selectedEma);updateChartIndicatorLabel();
     }
     private void updateChartIndicatorLabel(){

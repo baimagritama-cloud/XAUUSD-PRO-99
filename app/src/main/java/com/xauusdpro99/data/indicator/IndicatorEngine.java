@@ -72,9 +72,16 @@ public final class IndicatorEngine {
     }
 
     public Result calculate(CandleEngine.Snapshot snapshot, CandleEngine.Snapshot dailySnapshot, long nowMs) {
+        return calculateInternal(snapshot,dailySnapshot,nowMs,false);
+    }
+    /** Historical chart only; STALE remains STALE. */
+    public Result calculateForChart(CandleEngine.Snapshot snapshot, CandleEngine.Snapshot dailySnapshot, long nowMs) {
+        return calculateInternal(snapshot,dailySnapshot,nowMs,true);
+    }
+    private Result calculateInternal(CandleEngine.Snapshot snapshot, CandleEngine.Snapshot dailySnapshot, long nowMs, boolean chartOnly) {
         if (snapshot == null) return Result.unavailable("UNKNOWN", Validity.UNAVAILABLE, "NO CANDLE SNAPSHOT", nowMs, 0);
         String tf = snapshot.timeframe.name();
-        if (snapshot.sourceStatus == CandleEngine.SourceStatus.STALE)
+        if (snapshot.sourceStatus == CandleEngine.SourceStatus.STALE && !chartOnly)
             return Result.unavailable(tf, Validity.STALE, "STALE DATA — calculation blocked", nowMs, snapshot.closed.size());
         if (snapshot.sourceStatus == CandleEngine.SourceStatus.UNAVAILABLE)
             return Result.unavailable(tf, Validity.UNAVAILABLE, "SOURCE UNAVAILABLE", nowMs, snapshot.closed.size());
@@ -122,7 +129,7 @@ public final class IndicatorEngine {
                 && pivots.p != null;
         String detail = enoughForAll ? "VALID CLOSED OHLC"
                 : "NOT ENOUGH DATA untuk satu atau lebih indikator; nilai yang sudah memenuhi periode tetap ditampilkan";
-        return new Result(tf, enoughForAll ? Validity.LIVE : Validity.NOT_ENOUGH_DATA, detail, nowMs, bars.size(),
+        return new Result(tf, snapshot.sourceStatus == CandleEngine.SourceStatus.STALE ? Validity.STALE : (enoughForAll ? Validity.LIVE : Validity.NOT_ENOUGH_DATA), snapshot.sourceStatus == CandleEngine.SourceStatus.STALE ? "STALE HISTORICAL CHART ONLY" : detail, nowMs, bars.size(),
                 rsi,mom, adx==null?null:adx.adx, adx==null?null:adx.plusDi, adx==null?null:adx.minusDi,
                 e10,e20,e50,e100,e200,tenkan,kijun,spanA,spanB,atrValue,atrPercent,atrVsAverage,
                 pivots.p,pivots.r1,pivots.r2,pivots.r3,pivots.s1,pivots.s2,pivots.s3,
