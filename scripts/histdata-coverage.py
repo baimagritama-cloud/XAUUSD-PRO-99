@@ -129,6 +129,25 @@ def audit():
             else:kind='UNEXPLAINED_MISSING_MINUTES'
             unmatched_classes[kind]+=1
             unmatched.append({'previous_utc':a,'next_utc':b,'missing_minutes':missing,'quarantined_minutes':quarantined,'candidate':kind,'first_affected_day_utc':(a+60)//86400*86400,'last_affected_day_utc':(b-60)//86400*86400,'first_affected_week_utc':(a+60+259200)//604800*604800-259200,'last_affected_week_utc':(b-60+259200)//604800*604800-259200})
+    # Calendar evidence inventory: classify every observed missing interval,
+    # including provider overlaps. No provider report certifies a market closure.
+    all_gaps=[]; calendar_classes=Counter()
+    for a,b in zip(valid_times,valid_times[1:]):
+        if b-a<=60:continue
+        i=bisect.bisect_left(starts,b)-1
+        overlap=i>=0 and prefix[i]>a
+        missing=(b-a)//60-1
+        q=bisect.bisect_left(conflict_times,b)-bisect.bisect_right(conflict_times,a)
+        left=datetime.datetime.fromtimestamp(a,tz);right=datetime.datetime.fromtimestamp(b,tz)
+        weekend=left.weekday()==4 and right.weekday() in (6,0) and 36*3600<=b-a<=(60 if right.weekday()==6 else 84)*3600
+        pause=left.date()==right.date() and left.hour in (15,16,17) and 3300<=b-a<=3900
+        kind='CONFLICT_ONLY' if q==missing else 'MIXED_CONFLICT' if q else 'WEEKEND_CANDIDATE' if weekend else 'DAILY_PAUSE_CANDIDATE' if pause else 'PROVIDER_REPORTED_UNVERIFIED' if overlap else 'UNEXPLAINED'
+        calendar_classes[kind]+=1
+        all_gaps.append({'previous_utc':a,'next_utc':b,'missing_minutes':missing,'conflicting_minutes':q,'provider_overlap':overlap,'classification':kind,'closure_verified':False})
+    if len(all_gaps)!=gaps['observed'] or sum(calendar_classes.values())!=len(all_gaps):raise ValueError('All gap reconciliation failed')
+    (out/'all-calendar-gaps.json').write_text(json.dumps(all_gaps,indent=2))
+    report['histdata']['calendar_evidence_audit']={'classes':dict(calendar_classes),'total':len(all_gaps),'verified_closures':0,'calendar_verified':False,'status':'SOURCE_SPECIFIC_HISTORICAL_CALENDAR_REQUIRED'}
+    print(json.dumps({'calendar_evidence_audit':report['histdata']['calendar_evidence_audit']}),flush=True)
     (out/'unmatched-gaps.json').write_text(json.dumps(unmatched,indent=2))
     report['histdata']['unmatched_gap_audit']={'classes':dict(unmatched_classes),'total':len(unmatched),'missing_minutes':sum(x['missing_minutes'] for x in unmatched),'quarantined_minutes':sum(x['quarantined_minutes'] for x in unmatched),'calendar_verified':False}
     print(json.dumps(report['histdata']['unmatched_gap_audit']),flush=True)
